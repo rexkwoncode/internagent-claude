@@ -5,7 +5,9 @@ from functools import cache
 import json
 import os
 from pathlib import Path
+import re
 import runpy
+from shutil import copyfile
 import sys
 import time
 from types import ModuleType, SimpleNamespace
@@ -304,6 +306,28 @@ def is_paper_task(checkout, args):
                for directory in (checkout, checkout / "tasks"))
 
 
+def seed_session(mailbox, args):
+    if "--skip_idea_generation" not in args:
+        return
+    for index, arg in enumerate(args):
+        if arg.startswith("--idea_path="):
+            source = arg.partition("=")[2]
+            prefix = "--idea_path="
+        elif arg == "--idea_path" and index + 1 < len(args):
+            index += 1
+            source = args[index]
+            prefix = ""
+        else:
+            continue
+        # The pinned launcher derives the session ID from this path and
+        # requires one when writing task memory or generating experiences.
+        if not re.search(r"session_\d+", source):
+            destination = mailbox.directory / f"session_{time.time_ns()}_ideas.json"
+            copyfile(source, destination)
+            args[index] = prefix + str(destination)
+        return
+
+
 def main():
     engine, checkout, mailbox_dir, *args = sys.argv[1:]
     checkout = Path(checkout).resolve()
@@ -320,6 +344,7 @@ def main():
     else:
         config = load_settings(Path(config_path).resolve())
     os.chdir(checkout)
+    seed_session(mailbox, args)
 
     @cache
     def local_embeddings():
