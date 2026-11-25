@@ -1,0 +1,14 @@
+{
+  "InternAgent": {
+    "url": "https://github.com/InternScience/InternAgent.git",
+    "commit": "fa8c3eedfa9751d3752ea6eb49220b303ac2397d"
+  },
+  "MLEvolve": {
+    "url": "https://github.com/InternScience/MLEvolve.git",
+    "commit": "77cf997b35c0f3b40a95a0b9607bef6ea9f576b6"
+  },
+  "ResearchClawBench": {
+    "url": "https://github.com/InternScience/ResearchClawBench.git",
+    "commit": "9b5288e3abe660bf1c1e4bcec57f474e6e1c7ce5"
+  }
+}

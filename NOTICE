@@ -1,0 +1,11 @@
+InternAgent for Claude Code
+
+This distribution ports workflow and search behavior from:
+- InternAgent, Copyright 2026 InternAgent Team, Shanghai Artificial Intelligence Laboratory, Apache License 2.0.
+  https://github.com/InternScience/InternAgent
+- MLEvolve, Copyright 2026 MLEvolve Team, Shanghai Artificial Intelligence Laboratory, Apache License 2.0.
+  https://github.com/InternScience/MLEvolve
+
+The original MLEvolve snapshot and its license accompany this distribution under upstream/MLEvolve.
+The Claude Code skills, local runner, search scheduler, and synthetic example are native adaptations.
+The ResearchClawBench evaluation source is distributed under its MIT license in upstream/ResearchClawBench. Benchmark datasets and paper assets are fetched separately from https://github.com/InternScience/ResearchClawBench under their upstream terms.

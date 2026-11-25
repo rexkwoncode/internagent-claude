@@ -1,0 +1,15 @@
+{
+  "name": "internagent",
+  "version": "0.1.0",
+  "description": "Subscription-native research, model building, and MLEvolve-style experiment search.",
+  "author": {
+    "name": "InternAgent Claude Code Port"
+  },
+  "homepage": "https://github.com/rexkwoncode/internagent-claude",
+  "license": "Apache-2.0",
+  "keywords": [
+    "machine-learning",
+    "research",
+    "mlevolve"
+  ]
+}

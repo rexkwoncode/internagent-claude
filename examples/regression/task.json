@@ -1,0 +1,16 @@
+{
+  "objective": "Fit a regression model for a nonlinear synthetic target from three numeric inputs. Minimize validation MSE and generalize to the holdout. Keep the train(rows) interface in model.mjs.",
+  "seed": "seed",
+  "metric": "mse",
+  "direction": "minimize",
+  "validation": [
+    "node",
+    "score.mjs"
+  ],
+  "holdout": [
+    "node",
+    "score.mjs"
+  ],
+  "trials": 5,
+  "timeoutSeconds": 20
+}
