@@ -4,11 +4,52 @@ import {
   closeSync, cpSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, realpathSync,
   renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { recall } from './memory.mjs';
 import { choose, leaderboard } from './search.mjs';
 
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+const modelRoles = ['planner', 'builder', 'reviewer'];
+const modelAliases = ['inherit', 'haiku', 'sonnet', 'opus', 'fable'];
+
+function validateModels(models, label = 'models') {
+  if (!models || typeof models !== 'object' || Array.isArray(models)) {
+    throw new Error(label + ' must be an object.');
+  }
+  for (const [role, alias] of Object.entries(models)) {
+    if (role !== 'default' && !modelRoles.includes(role)) throw new Error('Unknown ' + label + ' key: ' + role);
+    if (!modelAliases.includes(alias)) {
+      throw new Error(label + '.' + role + ' must be one of: ' + modelAliases.join(', '));
+    }
+  }
+  return models;
+}
+
+function readModelSettings(file) {
+  try {
+    return validateModels(read(file)?.models, 'models in ' + file);
+  } catch (error) {
+    if (error.code === 'ENOENT') return {};
+    if (error instanceof SyntaxError) throw new Error('Invalid JSON in ' + file + ': ' + error.message);
+    throw error;
+  }
+}
+
+function resolveModels(...layers) {
+  return Object.fromEntries(modelRoles.map(role => {
+    const alias = layers.map(layer => layer[role] ?? layer.default).find(value => value !== undefined);
+    return [role, alias ?? 'inherit'];
+  }));
+}
+
+function effectiveModels(taskModels) {
+  const task = taskModels === undefined ? {} : validateModels(taskModels);
+  const user = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
+  return resolveModels(task, readModelSettings(resolve('internagent.config.json')),
+    readModelSettings(resolve(user, 'internagent.json')));
+}
+
 function save(file, value) {
   const pending = file + '.' + randomUUID() + '.tmp';
   writeFileSync(pending, JSON.stringify(value, null, 2) + '\n', { flag: 'wx' });
@@ -46,6 +87,7 @@ function snapshot(source, target) {
 
 function initialize(specFile, runDir) {
   const spec = validate(read(specFile));
+  spec.models = effectiveModels(spec.models);
   const taskDir = dirname(specFile);
   const seed = realpathSync(resolve(taskDir, spec.seed));
   if (!statSync(seed).isDirectory()) throw new Error('Seed must be a directory.');
@@ -64,7 +106,7 @@ function initialize(specFile, runDir) {
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
-  return { run: runDir, objective: spec.objective, trialBudget: spec.trials };
+  return { run: runDir, objective: spec.objective, trialBudget: spec.trials, models: spec.models };
 }
 
 function withLock(runDir, action) {
@@ -148,6 +190,7 @@ function overview(state) {
     objective: state.spec.objective,
     metric: state.spec.metric,
     direction: state.spec.direction,
+    models: resolveModels(state.spec.models ?? {}),
     attempted: state.trials.filter(t => t.status !== 'pending').length,
     trialBudget: state.spec.trials,
     best: top[0] ?? null,
@@ -158,12 +201,13 @@ function overview(state) {
 }
 
 function main([command, pathArg, another, note]) {
+  if (command === 'models') return effectiveModels(pathArg ? read(resolve(pathArg))?.models : undefined);
   if (command === 'recall' && pathArg && another) {
     return recall(resolve(pathArg), another, note ? resolve(note) : undefined);
   }
   if (!['init', 'status', 'next', 'evaluate', 'finish'].includes(command) || !pathArg ||
       (['init', 'evaluate'].includes(command) && !another)) {
-    throw new Error('Usage: run.mjs init <task.json> <run> | status <run> | next <run> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
+    throw new Error('Usage: run.mjs init <task.json> <run> | models [task.json] | status <run> | next <run> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
   }
   const runDir = resolve(command === 'init' ? another : pathArg);
   if (command === 'init') return initialize(resolve(pathArg), runDir);

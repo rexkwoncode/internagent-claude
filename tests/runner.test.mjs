@@ -8,6 +8,62 @@ import { test } from 'node:test';
 
 const runner = fileURLToPath(new URL('../scripts/run.mjs', import.meta.url));
 
+test('persistent model policy precedence, validation, and resume', () => {
+  const working = mkdtempSync(join(tmpdir(), 'internagent-models-'));
+  try {
+    const file = join(working, 'task.json');
+    const run = join(working, 'run');
+    const userDir = join(working, 'claude');
+    const userFile = join(userDir, 'internagent.json');
+    const projectFile = join(working, 'internagent.config.json');
+    const spec = {
+      objective: 'minimize error', seed: 'seed', direction: 'minimize',
+      metric: 'mse', validation: [process.execPath, 'evaluate.mjs'],
+    };
+    const cli = (...args) => spawnSync(process.execPath, [runner, ...args], {
+      cwd: working, encoding: 'utf8', env: { ...process.env, CLAUDE_CONFIG_DIR: userDir },
+    });
+    const writeSpec = value => writeFileSync(file, JSON.stringify(value));
+    mkdirSync(join(working, 'seed'));
+    mkdirSync(userDir);
+    writeFileSync(userFile, JSON.stringify({ models: { default: 'haiku', builder: 'sonnet' } }));
+    writeFileSync(projectFile, JSON.stringify({ models: { reviewer: 'inherit' } }));
+    assert.deepEqual(JSON.parse(cli('models').stdout), {
+      planner: 'haiku', builder: 'sonnet', reviewer: 'inherit',
+    });
+    for (const [models, message] of [
+      [null, /models must be an object/],
+      [{ coder: 'haiku' }, /Unknown models key: coder/],
+      [{ builder: 'claude-sonnet-5' }, /models.builder must be one of/],
+    ]) {
+      writeSpec({ ...spec, models });
+      const invalid = cli('init', file, run);
+      assert.equal(invalid.status, 1);
+      assert.match(invalid.stderr, message);
+    }
+    writeSpec({ ...spec, models: { default: 'sonnet', builder: 'opus' } });
+    const init = cli('init', file, run);
+    assert.equal(init.status, 0, init.stderr);
+    const expected = { planner: 'sonnet', builder: 'opus', reviewer: 'sonnet' };
+    assert.deepEqual(JSON.parse(init.stdout).models, expected);
+    writeSpec(spec);
+    rmSync(userFile);
+    rmSync(projectFile);
+    assert.deepEqual(JSON.parse(cli('status', run).stdout).models, expected);
+
+    writeFileSync(projectFile, '{}');
+    assert.match(cli('models').stderr, /models in .*internagent\.config\.json must be an object/);
+    rmSync(projectFile);
+    const legacy = cli('init', file, join(working, 'legacy'));
+    assert.equal(legacy.status, 0, legacy.stderr);
+    assert.deepEqual(JSON.parse(legacy.stdout).models, {
+      planner: 'inherit', builder: 'inherit', reviewer: 'inherit',
+    });
+  } finally {
+    rmSync(working, { recursive: true, force: true });
+  }
+});
+
 test('checkpointed candidates, objective ranking, logs, and winner-only holdout', () => {
   const working = mkdtempSync(join(tmpdir(), 'internagent test '));
   try {

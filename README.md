@@ -7,7 +7,7 @@
 
 **Build, compare, and refine ML models from a Claude Code session.** Start with a local dataset and an objective. Claude proposes and implements candidates, and a local runner records their scores and keeps the run resumable. Use your existing Claude subscription sign-in with no API key.
 
-[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Your own task](#prepare-a-model-task) · [Upstream components](#upstream-components) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Your own task](#prepare-a-model-task) · [Model settings](#persistent-model-settings) · [Upstream components](#upstream-components) · [Contributing](#contributing)
 
 ## How it works
 
@@ -127,6 +127,23 @@ node <plugin>/scripts/run.mjs finish <run>
 ```
 
 Use one Claude Code session per run. If a process was force-terminated and the run still contains `.lock`, check that the recorded process ID and its evaluator are stopped before removing that lock file. Then resume normally. If validation fails on the baseline, repair the environment or task contract and start a fresh run so the new comparison uses a clean baseline.
+
+## Persistent model settings
+
+Set your model preferences once. InternAgent reads them automatically when you start a model-building run. Save this example as `~/.claude/internagent.json` for your user account or as `internagent.config.json` in the project root for a specific project.
+
+```json
+{
+  "models": {
+    "default": "haiku",
+    "builder": "sonnet"
+  }
+}
+```
+
+This runs the planner and reviewer on Haiku and the builder on Sonnet. For an individual task, add the same `models` object to its `task.json`. For each role, InternAgent checks the task, project, then user config, stopping at the first layer with a role setting or a `default`. Within that layer the role setting wins. A run saves the resolved aliases so resume uses the same policy even if your config files change. If you set `CLAUDE_CONFIG_DIR`, put the user file there.
+
+Supported values are `haiku`, `sonnet`, `opus`, `fable`, and `inherit`. With `inherit` or no configured value, that role uses the Claude Code session's model. Set the coordinator separately with `/model` or the `claude --model` flag. Claude Code determines model availability and counts usage against your plan. The task's `trials` setting controls how many experiments run.
 
 ## Upstream components
 
