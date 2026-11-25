@@ -7,9 +7,9 @@
 
 **Design, run, and reproduce research experiments in Claude Code.** Start with a question, an implementation to compare, or a paper to reproduce. InternAgent helps define the experiment, test hypotheses, and retain the evidence so you can resume. Use your existing Claude subscription sign-in with no API key.
 
-To run the original Python engines and their memory, research tools, and experiment orchestration, use `/internagent:upstream`. [Set up the upstream runtime](docs/upstream-runtime.md).
+The default `/internagent:run` command runs the original Python engines with their memory, research tools, and experiment orchestration. [Set up the upstream runtime](docs/upstream-runtime.md).
 
-[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Task catalog](#task-catalog) · [Your own task](#prepare-an-experiment) · [Agent models](#persistent-model-settings) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Task catalog](#task-catalog) · [Your own task](#prepare-a-lightweight-experiment) · [Agent models](#persistent-model-settings) · [Contributing](#contributing)
 
 ## How it works
 
@@ -32,7 +32,7 @@ Scored runs generate competing hypotheses, critique and revise them, then rank t
 ```mermaid
 flowchart LR
     Claude["Claude Code (subscription)"] --> Plugin["InternAgent plugin"]
-    Plugin <-->|Upstream mode| Engine["InternAgent or MLEvolve"]
+    Plugin <-->|Default| Engine["InternAgent or MLEvolve"]
     Engine --> Sources["Memory, research tools, and evaluators"]
     Plugin --> Runner["Lightweight local runner"]
 ```
@@ -72,11 +72,13 @@ To update, refresh the marketplace in `/plugin` and update `internagent@internag
 
 | Command | What it does |
 | --- | --- |
-| `/internagent:run demo` | Fit a nonlinear synthetic regression with five trials and a fixed holdout. It uses only Node.js for training and scoring. |
+| `/internagent:lightweight demo` | Fit a nonlinear synthetic regression with five trials and a fixed holdout. It uses only Node.js for training and scoring. |
 | `/internagent:build <research objective>` | Set up and run an experiment using your question, project, and constraints. |
-| `/internagent:run <task.json> [run-directory]` | Run a prepared experiment using its fixed evaluator and seed. |
-| `/internagent:run resume <run-directory>` | Continue from the recorded trial state in another session. |
-| `/internagent:upstream <options.json>` | Drive the pinned InternAgent or MLEvolve Python engine from your Claude Code session. |
+| `/internagent:run [options.json or task]` | Run pinned InternAgent or MLEvolve. With no arguments, load the project options from `internagent-upstream.json`. |
+| `/internagent:run report <task>` | Run upstream InternAgent in report mode. |
+| `/internagent:lightweight <task.json>` | Run a prepared JSON experiment using its fixed evaluator and seed. |
+| `/internagent:lightweight resume <run-directory>` | Resume an existing lightweight run. |
+| `/internagent:upstream <options.json>` | Alias for `/internagent:run`. |
 | `/internagent:configure` | Choose and save Claude agent model defaults interactively. |
 | `/internagent:discover <list\|task-id\|task-folder> [arguments]` | Find and run a catalog task, upstream discovery experiment, or paper reproduction. |
 | `/internagent:research <question>` | Answer a research question and prepare evidence-based hypotheses. |
@@ -89,7 +91,7 @@ A scripted run can use Claude Code print mode from a trusted project directory. 
 ```powershell
 $plugin = (Resolve-Path "C:/path/to/internagent-claude").Path.Replace('\', '/')
 $runner = 'node "' + $plugin + '/scripts/run.mjs" *'
-claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permission-mode acceptEdits --allowedTools Agent "Bash($runner)" "PowerShell($runner)"
+claude -p "/internagent:lightweight demo .internagent/demo" --plugin-dir $plugin --permission-mode acceptEdits --allowedTools Agent "Bash($runner)" "PowerShell($runner)"
 ```
 
 ## Task catalog
@@ -147,7 +149,7 @@ For a machine-specific launcher, pass an options JSON file as the second argumen
 
 <a name="prepare-a-model-task"></a>
 
-## Prepare an experiment
+## Prepare a lightweight experiment
 
 Put `task.json`, the trusted evaluator, and a small `seed` directory in a project folder. Keep large inputs, symbolic links, and language environments outside the seed. The runner copies the seed and candidate source trees. This example compares simulation error against a reference solution.
 

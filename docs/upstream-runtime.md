@@ -1,6 +1,6 @@
 # Run the upstream engines from Claude Code
 
-`/internagent:upstream` runs the original pinned Python workflow. Use it when you want InternAgent's own idea agents, memory, discovery loop, and experiment dispatcher, or MLEvolve's own progressive graph search, workers, and memory. The regular `/internagent:run` command uses the plugin's smaller local runner.
+`/internagent:run` uses the original pinned Python workflow by default. Pass a catalog task, task folder, or options file. Save options as `internagent-upstream.json` in the project root to run them without arguments. `/internagent:upstream` is an alias. Use `/internagent:lightweight` for the Node.js runner.
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ On Windows, install `psutil` in the MLEvolve environment and use `copy_data=true
 
 ### InternAgent
 
-Copy the engine's `config/default_config.yaml` into the project and set the following fields in that copy. Existing per-agent `model_provider` values can select another configured provider. An agent using `default` follows `models.default_provider`.
+Omit `config` to use the pinned engine defaults with Claude Code inference, saved model preferences, and local embeddings. To customize the workflow, copy `config/default_config.yaml` into the project and set the following fields in that copy. Existing per-agent `model_provider` values can select another configured provider. An agent using `default` follows `models.default_provider`.
 
 ```yaml
 models:
@@ -37,7 +37,7 @@ experiment:
 
 For local task memory, set `memory.task_memory.embedding.model_type` to `local` and `model_name` to a local Sentence Transformers path or a downloadable model. Long memory uses the upstream Chroma and NetworkX idea graph with Chroma's default local encoder. Install `chromadb`, `networkx`, and `pyclustering` if they are absent from the selected environment. The first run downloads the local encoder into the upstream run directory's parent. Use a fresh memory directory or a separate task namespace when migrating a graph with existing OpenAI vectors. Embeddings from different models cannot share a collection.
 
-Write an options JSON file in your project and invoke `/internagent:upstream internagent-upstream.json`.
+Write an options JSON file in your project and invoke `/internagent:run internagent-upstream.json`.
 
 ```json
 {
@@ -74,7 +74,7 @@ Use a MLEvolve configuration and the original Hydra-style arguments. Set `agent.
 }
 ```
 
-See the engine's [configuration and task instructions](https://github.com/InternScience/MLEvolve/tree/77cf997b35c0f3b40a95a0b9607bef6ea9f576b6#quick-start) for task scoring, worker configuration, hardware, and model checkpoints. Launch MLEvolve using `/internagent:upstream mlevolve-upstream.json`.
+See the engine's [configuration and task instructions](https://github.com/InternScience/MLEvolve/tree/77cf997b35c0f3b40a95a0b9607bef6ea9f576b6#quick-start) for task scoring, worker configuration, hardware, and model checkpoints. Launch MLEvolve using `/internagent:run mlevolve-upstream.json`.
 
 ## Provider coverage
 

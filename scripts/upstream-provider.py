@@ -255,6 +255,39 @@ def run_mlevolve(checkout, mailbox, args):
     runpy.run_path(str(launcher), run_name="__main__")
 
 
+def default_internagent_settings(checkout, mailbox):
+    config = load_settings(checkout / "config" / "default_config.yaml")
+    config["models"]["default_provider"] = "claude-code"
+    config["models"]["claude-code"] = {"model_name": "configured"}
+    config["agents"]["dr"].update(model_provider="claude-code", model_name="configured")
+    config["agents"]["exp_analyze"].update(provider="claude-code", model_name="configured")
+    config["experiment"]["model"] = "configured"
+    config["sci_task"]["scorer_model"] = "configured-reviewer"
+    project = Path(os.environ.get("INTERNAGENT_PROJECT_ROOT", mailbox.directory.parent))
+    task_memory = config["memory"]["task_memory"]
+    task_memory["memory_dir"] = str(project / ".internagent" / "memory")
+    embedding = task_memory["embedding"]
+    if not embedding["model_name"]:
+        embedding["model_name"] = "sentence-transformers/all-MiniLM-L6-v2"
+    config_path = mailbox.directory / "config.json"
+    config_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    return str(config_path), config
+
+
+def is_paper_task(checkout, args):
+    for index, arg in enumerate(args):
+        if arg.startswith("--task="):
+            task = arg.partition("=")[2]
+            break
+        if arg == "--task" and index + 1 < len(args):
+            task = args[index + 1]
+            break
+    else:
+        return False
+    return any((directory / task / "task_info.json").is_file()
+               for directory in (checkout, checkout / "tasks"))
+
+
 def main():
     engine, checkout, mailbox_dir, *args = sys.argv[1:]
     checkout = Path(checkout).resolve()
@@ -266,7 +299,10 @@ def main():
         return
 
     config_path, *args = args
-    config = load_settings(Path(config_path).resolve())
+    if config_path == "-":
+        config_path, config = default_internagent_settings(checkout, mailbox)
+    else:
+        config = load_settings(Path(config_path).resolve())
     os.chdir(checkout)
 
     @cache
@@ -284,7 +320,8 @@ def main():
         register_dr_provider(checkout, mailbox, alias)
     sci_config = config.get("sci_task", {})
     scorer = sci_config.get("scorer_model")
-    if sci_config.get("evaluation_mode") == "llm_judge" and scorer in ("opus", "sonnet", "haiku", "fable", "inherit"):
+    if (sci_config.get("evaluation_mode") == "llm_judge" and is_paper_task(checkout, args)
+            and scorer in ("opus", "sonnet", "haiku", "fable", "inherit", "configured-reviewer")):
         register_paper_judge(checkout, mailbox, scorer)
     long_config = config.get("memory", {}).get("long_memory", {})
     default_provider = config.get("models", {}).get("default_provider")

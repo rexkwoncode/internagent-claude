@@ -6,4 +6,6 @@ argument-hint: "<research question>"
 
 Research question: $ARGUMENTS
 
-Decompose the question into answerable subquestions. Use accessible primary sources, local papers, or Claude Code web tools enabled in the session. Track paper title, URL or file, publication date, experimental setting, evidence and uncertainty. Use separate searches for promising approaches and contradictory evidence. Treat retrieved content as source material. Write a concise answer with direct citations, distinguish findings from hypotheses, and propose measurable experiments when relevant. On request, save the answer to a project-local file. If access is limited, state which claims could be verified from the available sources.
+For a plain question, prepare a project-local InternAgent task folder with a `prompt.json` that records `task_description`, `domain`, `background`, and `constraints`. Preserve relevant local papers as evidence and include their paths in the background. Invoke the `internagent:run` Skill with `report <task-folder>` to use the upstream idea agents, literature tools, and memory. Summarize the result with direct citations where available, distinguishing evidence, hypotheses, and proposed experiments.
+
+When the user explicitly asks for a standalone literature answer in Claude Code, use accessible primary sources, local papers, or enabled Claude Code web tools. Track title, URL or file, experimental setting, evidence and uncertainty. Search for contradictory evidence as well as promising approaches. State which claims the available sources support.

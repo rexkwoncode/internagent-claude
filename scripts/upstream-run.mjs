@@ -25,8 +25,9 @@ function run(directory, optionsFile) {
   if (!['InternAgent', 'MLEvolve'].includes(engine) || typeof location !== 'string' || !location ||
       typeof python !== 'string' || !python || !Array.isArray(args) ||
       args.some(arg => typeof arg !== 'string') || (engine === 'InternAgent' &&
-      (typeof config !== 'string' || !config || args.some(arg => /^--config(?:=|$)/.test(arg))))) {
-    throw new Error('Expected engine, checkout, optional python and args, and a config file for InternAgent.');
+      ((config !== undefined && (typeof config !== 'string' || !config)) ||
+       args.some(arg => /^--config(?:=|$)/.test(arg))))) {
+    throw new Error('Expected engine, checkout, optional python and args, and optional InternAgent config.');
   }
   const input = dirname(resolve(optionsFile));
   const checkout = resolve(input, location);
@@ -35,14 +36,19 @@ function run(directory, optionsFile) {
     throw new Error('Use the pinned ' + engine + ' checkout from upstream/revisions.json.');
   }
   const configPath = config && resolve(input, config);
-  if (engine === 'InternAgent' && !existsSync(configPath)) throw new Error('Missing InternAgent config: ' + configPath);
+  if (engine === 'InternAgent' && configPath && !existsSync(configPath)) {
+    throw new Error('Missing InternAgent config: ' + configPath);
+  }
   mkdirSync(dirname(directory), { recursive: true });
   mkdirSync(directory);
   const adapter = fileURLToPath(new URL('upstream-provider.py', import.meta.url));
-  const argumentsForEngine = engine === 'InternAgent' ? [configPath, ...args] : args;
+  const argumentsForEngine = engine === 'InternAgent' ? [configPath ?? '-', ...args] : args;
+  if (engine === 'InternAgent' && !args.some(arg => /^--exp_backend(?:=|$)/.test(arg))) {
+    argumentsForEngine.push('--exp_backend', 'claudecode');
+  }
   const child = spawnSync(python, [adapter, engine, checkout, directory, ...argumentsForEngine], {
     cwd: checkout, stdio: 'inherit', windowsHide: true,
-    env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONUTF8: '1' },
+    env: { ...process.env, PYTHONUNBUFFERED: '1', PYTHONUTF8: '1', INTERNAGENT_PROJECT_ROOT: process.cwd() },
   });
   const outcome = { engine, exit: child.status, signal: child.signal, error: child.error?.message };
   save(join(directory, 'result.json'), outcome);
