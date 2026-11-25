@@ -81,6 +81,7 @@ function prepare(folder, destination, options = {}) {
     trials: options.trials ?? 3,
     timeoutSeconds: options.timeoutSeconds ?? (info.id === 'AutoDebug' ? 120 : 3600),
     models: options.models,
+    discovery: options.discovery,
   };
   const staging = destination + '.' + randomUUID() + '.prepare';
   mkdirSync(staging, { recursive: true });

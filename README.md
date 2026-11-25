@@ -14,29 +14,29 @@
 ```mermaid
 flowchart LR
     Task["Question + evaluation plan"] --> Baseline["Measure baseline"]
-    Baseline --> Plan["Plan candidate"]
-    Plan --> Build["Build or refine"]
-    Build --> Score["Run validation"]
-    Score -->|Trial budget remains| Plan
-    Score -->|Budget used| Review["Review winner"]
+    Baseline --> Ideas["Generate and rank hypotheses"]
+    Ideas --> Search["Build, explore, and measure candidates"]
+    Search -->|Next round| Ideas
+    Search -->|Budget used| Review["Review winner"]
     Review -->|If configured| Holdout["Evaluate holdout"]
     Review -->|Without holdout| Report["Implementation + evidence"]
     Holdout --> Report
 ```
 
-The search starts with independent drafts, refines promising candidates, and can debug failed trials or combine complementary changes. Each trial saves its source, measured score, parent candidates, and evaluator logs. You can resume after closing Claude Code.
+Scored runs generate competing hypotheses, critique and revise them, then rank them and plan experiments for the strongest ideas. Candidate search explores independent branches, debugs failures, and can evolve stalled branches or fuse complementary changes. The runner saves the decisions, candidate trees, measured scores, and evaluator logs so you can resume after closing Claude Code.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
     Claude["Claude Code (subscription)"] --> Plugin["InternAgent plugin"]
-    Plugin <--> Runner["Local experiment runner"]
+    Plugin --> Discovery["InternAgent idea workflow"]
+    Discovery --> Runner["Local runner (MLEvolve search)"]
     Runner <--> Evaluator["Project evaluator"]
     ResearchClaw["ResearchClawBench tasks"] --> Plugin
 ```
 
-Claude Code handles inference and runs the [plugin's skills](skills/) and [agents](agents/). InternAgent routes each task to an experiment, literature research, or paper reproduction. For scored experiments, the [local runner](scripts/run.mjs) executes the evaluator and uses the [MLEvolve-style scheduler](scripts/search.mjs) to select candidate experiments. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned algorithm tasks and paper inputs.
+Claude Code handles inference for the [plugin's skills](skills/) and [agents](agents/). InternAgent routes each task to an experiment, literature research, or paper reproduction. The [discovery workflow](scripts/discovery.mjs) turns ideas into ranked experiment plans. The [local runner](scripts/run.mjs) executes the evaluator and uses the [MLEvolve search port](scripts/search.mjs) to select the next candidate. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned algorithm tasks and paper inputs.
 
 ## Quickstart
 
@@ -180,11 +180,37 @@ The runner can also be inspected directly.
 ```text
 node <plugin>/scripts/run.mjs status <run>
 node <plugin>/scripts/run.mjs next <run>
+node <plugin>/scripts/run.mjs stage <run> <phase> <artifact.json>
 node <plugin>/scripts/run.mjs evaluate <run> <trial-id> "<experiment note>"
 node <plugin>/scripts/run.mjs finish <run>
 ```
 
 Use one Claude Code session per run. If a process was force-terminated and the run still contains `.lock`, check that the recorded process ID and its evaluator are stopped before removing that lock file. Then resume normally. If validation fails on the baseline, repair the environment or task contract and start a fresh run so the new comparison uses a clean baseline.
+
+## Discovery rounds
+
+New scored runs from Claude Code default to one discovery round and draft the top two ideas when the trial budget permits. Increase `trials` to leave room for refinements after drafting. Use `discovery` in a task JSON or benchmark options JSON to change the strategy. For example, with `"trials": 13` this leaves six candidate trials per round after the initial baseline.
+
+```json
+"discovery": {
+  "rounds": 2,
+  "mode": "incremental",
+  "topIdeas": 2
+}
+```
+
+| Setting | Effect |
+| --- | --- |
+| `rounds` | Split the candidate budget among successive discovery rounds. Later rounds see the measured outcomes of earlier rounds. |
+| `mode` | `fresh` starts drafts from the original baseline. `incremental` starts them from the best validated candidate so far. |
+| `topIdeas` | Maximum number of ranked ideas drafted per round. |
+| `seedIdeas` | Supply starting ideas with `id`, `title`, `hypothesis`, and `test`. Each ID is a unique lowercase slug. |
+| `skipGeneration` | Run one round directly from the first supplied seed ideas, in order. Add a `method` to a seed idea to provide a specific implementation plan. |
+| `feedback` | Supply written feedback for the idea workflow. |
+
+The runner checkpoints generation, critique and evidence, idea evolution, ranking, and final methods in `state.json`. Idea rankings choose the initial drafts. Validation scores decide which implementations win. Within a round, the scheduler uses UCT and shifts toward a branch-diverse set of top candidates as the trial budget runs out. It uses prior measurements for debugging, refinement, branch evolution, and fusion. A separate holdout, when configured, runs only after the winner is fixed.
+
+Set `"discovery": false` for the shorter draft-and-refine workflow. Existing runs resume with their recorded workflow.
 
 ## Persistent model settings
 
@@ -207,8 +233,8 @@ Supported values are `haiku`, `sonnet`, `opus`, `fable`, and `inherit`. With `in
 
 ## Upstream components
 
-- **InternAgent** supplies the discovery workflow pattern. The native skills implement research questions, hypothesis-driven experiments, evaluation, and reuse of recorded results. The runner retrieves relevant successes and failures from project-local trial histories using keyword overlap. The native port uses JSON task specs and Claude Code tools. Upstream YAML launchers, service integrations, and embedding memory remain part of the original Python distribution.
-- **MLEvolve** is a Git submodule pinned under `upstream/MLEvolve/`. The subscription workflow uses the native search scheduler and Claude Code agents for independent drafts, progressive exploration, improvements, debug retries, and cross-branch fusion. The upstream Python entry point has its own dependencies and provider configuration.
+- **InternAgent** supplies the hypothesis workflow and pinned task definitions. The native port uses JSON task specs, Claude Code research tools where available, and keyword retrieval over earlier local runs. The upstream Python distribution provides embedding-based idea memory, external provider integrations, and a YAML launcher.
+- **MLEvolve** is pinned under `upstream/MLEvolve/`. The native search port uses the trial budget for exploration and exploitation and runs candidate evaluations sequentially. Upstream MLEvolve also supports wall-clock scheduling, parallel workers, and GPU allocation. Its Python runner has its own dependencies and provider configuration.
 - **ResearchClawBench** is a Git submodule pinned under `upstream/ResearchClawBench/` at the same commit as InternAgent's `sci_tasks`. The plugin's lightweight task index ships separately. The reproduction skill uses the selected paper, dataset, and checklist to produce an evidence review.
 
 The [submodule URLs](.gitmodules) and [runtime fetch pins](upstream/revisions.json) identify the upstream sources. Plugin installs and ZIP archives contain the native workflow and task index. To check out the upstream source in a Git clone, initialize the submodule you need.

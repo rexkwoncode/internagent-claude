@@ -7,7 +7,8 @@ import {
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { recall } from './memory.mjs';
-import { choose, leaderboard } from './search.mjs';
+import { leaderboard } from './search.mjs';
+import { advance, recordPhase, validateDiscovery } from './discovery.mjs';
 
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const modelRoles = ['planner', 'builder', 'reviewer'];
@@ -115,8 +116,10 @@ function snapshot(source, target) {
   });
 }
 
-function initialize(specFile, runDir) {
+function initialize(specFile, runDir, profile) {
   const spec = validate(read(specFile));
+  if (spec.discovery === undefined && profile === 'discovery') spec.discovery = {};
+  spec.discovery = validateDiscovery(spec.discovery, spec.trials);
   spec.models = effectiveModels(spec.models);
   const taskDir = dirname(specFile);
   const seed = realpathSync(resolve(taskDir, spec.seed));
@@ -138,7 +141,7 @@ function initialize(specFile, runDir) {
   }
   return {
     run: runDir, objective: spec.objective, type: spec.type ?? 'experiment', constraints: spec.constraints,
-    trialBudget: spec.trials, models: spec.models,
+    trialBudget: spec.trials, models: spec.models, discovery: spec.discovery,
   };
 }
 
@@ -245,6 +248,8 @@ function overview(state) {
     best: top[0] ?? null,
     baseline: state.trials[0] ?? null,
     trials: state.trials,
+    discovery: state.spec.discovery,
+    rounds: state.rounds ?? [],
     final: state.final ?? null,
   };
 }
@@ -255,12 +260,13 @@ function main([command, pathArg, another, note]) {
   if (command === 'recall' && pathArg && another) {
     return recall(resolve(pathArg), another, note ? resolve(note) : undefined);
   }
-  if (!['init', 'status', 'next', 'evaluate', 'finish'].includes(command) || !pathArg ||
-      (['init', 'evaluate'].includes(command) && !another)) {
-    throw new Error('Usage: run.mjs init <task.json> <run> | models [task.json] | configure <scope> <role> <alias> | status <run> | next <run> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
+  if (!['init', 'status', 'next', 'stage', 'evaluate', 'finish'].includes(command) || !pathArg ||
+      (['init', 'evaluate', 'stage'].includes(command) && !another) || (command === 'stage' && !note) ||
+      (command === 'init' && note !== undefined && note !== 'discovery')) {
+    throw new Error('Usage: run.mjs init <task.json> <run> [discovery] | models [task.json] | configure <scope> <role> <alias> | status <run> | next <run> | stage <run> <phase> <artifact.json> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
   }
   const runDir = resolve(command === 'init' ? another : pathArg);
-  if (command === 'init') return initialize(resolve(pathArg), runDir);
+  if (command === 'init') return initialize(resolve(pathArg), runDir, note);
   if (command === 'status') return overview(read(join(runDir, 'state.json')));
 
   return withLock(join(runDir, '.lock'), 'Run is locked. See README for interrupted-run recovery.', () => {
@@ -268,11 +274,21 @@ function main([command, pathArg, another, note]) {
     const state = read(stateFile);
     const persist = () => save(stateFile, state);
     let trial = state.trials.find(t => t.status === 'pending');
+    if (command === 'stage') {
+      if (state.final || trial || !state.spec.discovery) throw new Error('There is no pending discovery phase.');
+      recordPhase(state, another, read(resolve(note)));
+      persist();
+      return { recorded: another, round: state.rounds.at(-1).number };
+    }
     if (command === 'next') {
       if (state.final) return { done: true, final: state.final };
       if (!trial) {
-        const suggestion = choose(state.trials, state.spec.direction, state.spec.trials);
+        const suggestion = advance(state);
         if (!suggestion) return { done: true, ...overview(state) };
+        if (suggestion.phase) {
+          persist();
+          return { ...suggestion, baseCandidate: candidate(runDir, suggestion.base) };
+        }
         trial = {
           id: String(state.trials.length).padStart(3, '0'),
           ...suggestion, status: 'pending',
@@ -282,6 +298,8 @@ function main([command, pathArg, another, note]) {
       }
       return {
         ...trial,
+        hypothesis: trial.idea ? state.rounds?.find(round => round.number === trial.round)
+          ?.methods.find(idea => idea.id === trial.idea) : undefined,
         candidate: prepare(runDir, trial),
         parentCandidates: trial.parents.map(id => candidate(runDir, id)),
       };
@@ -294,7 +312,7 @@ function main([command, pathArg, another, note]) {
     }
     if (state.final && state.final.holdout?.status !== 'failed') return state.final;
     if (trial) throw new Error('Evaluate the pending trial before finalizing.');
-    if (choose(state.trials, state.spec.direction, state.spec.trials)) {
+    if (advance(state)) {
       throw new Error('Complete the search budget before evaluating the holdout.');
     }
     const best = leaderboard(state.trials, state.spec.direction)[0];
