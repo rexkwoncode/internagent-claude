@@ -114,6 +114,17 @@ def register_provider(mailbox, embeddings):
             return tool_response(value, tools)
 
     ModelFactory.register_model("claude-code", ClaudeCodeModel)
+    original = ModelFactory.create_model_for_agent
+
+    def create_for_agent(agent_type, config):
+        if agent_type in ("experience", "prompt_evolver") and "models" in config and "_global_config" not in config:
+            # These two upstream callers pass the full configuration, while
+            # the model factory expects agent settings plus _global_config.
+            overrides = config.get("agents", {}).get(agent_type, {})
+            config = {**config, **overrides, "_global_config": config}
+        return original(agent_type, config)
+
+    ModelFactory.create_model_for_agent = staticmethod(create_for_agent)
 
 
 def register_dr_provider(checkout, mailbox, alias):
