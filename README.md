@@ -7,7 +7,7 @@
 
 **Build, compare, and refine ML models from a Claude Code session.** Start with a local dataset and an objective. Claude proposes and implements candidates, and a local runner records their scores and keeps the run resumable. Use your existing Claude subscription sign-in with no API key.
 
-[Quickstart](#quickstart) · [Commands](#commands) · [Your own task](#prepare-a-model-task) · [Upstream components](#upstream-components) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Your own task](#prepare-a-model-task) · [Upstream components](#upstream-components) · [Contributing](#contributing)
 
 ## How it works
 
@@ -24,6 +24,42 @@ flowchart LR
 ```
 
 The search starts with independent drafts, refines promising candidates, and can debug failed trials or combine complementary changes. Each trial saves its source, measured score, parent candidates, and evaluator logs. You can resume after closing Claude Code.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    User["ML objective or benchmark task"] --> Claude["Claude Code session"]
+    Claude <-->|Model calls| Subscription["Claude subscription"]
+
+    subgraph Plugin["InternAgent native plugin"]
+        Skills["Skills: build · run · research · reproduce"]
+        Agents["Agents: planner · builder · reviewer"]
+        Skills -->|Delegate planning, edits, and review| Agents
+    end
+    Claude -->|Invoke skill| Skills
+
+    subgraph Local["Local experiment runtime"]
+        Runner["Node.js runner"]
+        Search["Native MLEvolve-style search"]
+        History[("Trial history and lineage")]
+        Runner -->|Request next candidate| Search
+        Search -->|Trial mode and parents| Runner
+        Runner <-->|Record scores and recover state| History
+    end
+    Skills <-->|Schedule trials and read results| Runner
+    Agents -->|Write model code| Candidate["Candidate directory"]
+    Candidate -->|Model code| Evaluator["Project evaluator"]
+    Runner -->|Run validation or final holdout| Evaluator
+    Evaluator -->|Write metrics and artifacts| Runner
+    Runner --> Result["Winning model and run artifacts"]
+    Skills -->|Summarize evidence| Result
+
+    MLEvolve["Upstream MLEvolve"] -.->|Search design| Search
+    ResearchClaw["Pinned ResearchClawBench tasks"] -->|Data, paper, and checklist| Skills
+```
+
+Claude Code handles inference and runs the [plugin's skills](skills/) and [agents](agents/). The [local runner](scripts/run.mjs) executes the project's evaluator, persists results, and asks the [native search scheduler](scripts/search.mjs) which experiment to try next. The scheduler adapts MLEvolve's draft, refinement, debugging, and fusion stages. The bundled [upstream Python source](upstream/MLEvolve/) is available separately. The [ResearchClawBench adapter](scripts/upstream.mjs) fetches pinned task inputs for the reproduction skill.
 
 ## Quickstart
 
