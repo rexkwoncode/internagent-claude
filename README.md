@@ -2,6 +2,7 @@
 
 [![Claude Code](https://img.shields.io/badge/Claude_Code-native_plugin-D97757?style=flat-square)](https://code.claude.com/docs/en/plugins)
 [![Node.js 20+](https://img.shields.io/badge/Node.js-20%2B-43853D?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Tests](https://github.com/rexkwoncode/internagent-claude/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/rexkwoncode/internagent-claude/actions/workflows/tests.yml)
 [![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-3967BD?style=flat-square)](LICENSE)
 
 **Build, compare, and refine ML models from a Claude Code session.** Start with a local dataset and an objective. Claude proposes and implements candidates, and a local runner records their scores and keeps the run resumable. Use your existing Claude subscription sign-in with no API key.
@@ -33,7 +34,7 @@ Install [Claude Code](https://code.claude.com/docs/en/setup) and [Node.js 20+](h
 /plugin install internagent@internagent-claude
 ```
 
-The repository is private. Installation requires GitHub read access and a credential your local Git helper can use without prompting. If needed, sign in with `gh auth login` and configure the helper with `gh auth setup-git`. Claude inference uses your Claude subscription separately.
+The marketplace is publicly available over HTTPS. Anyone can install the plugin without a GitHub account. Model calls use your Claude Code sign-in.
 
 The same install is available from a shell.
 
