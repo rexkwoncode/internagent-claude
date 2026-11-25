@@ -90,21 +90,33 @@ $runner = 'node "' + $plugin + '/scripts/run.mjs" *'
 claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permission-mode acceptEdits --allowedTools Agent "Bash($runner)" "PowerShell($runner)"
 ```
 
-<a name="upstream-task-catalog"></a>
-
 ## Task catalog
 
 ```text
 /internagent:discover list
+```
+
+### Local additions
+
+These research tasks are maintained in this plugin’s [local catalog](catalog/local-tasks.json).
+
+| Task | Workflow |
+| --- | --- |
+| [AlgorithmEngineering](docs/algorithm-engineering.md) | Design, analyze, implement, and measure competing approaches to an algorithmic problem. |
+
+<a name="upstream-task-catalog"></a>
+
+### Upstream tasks
+
+This group contains 13 discovery tasks from the [pinned InternAgent revision](upstream/revisions.json) and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches the selected task on demand. You can also point it at a task folder in an existing checkout.
+
+```text
 /internagent:discover AutoDebug
 /internagent:discover Astronomy_000
 ```
 
-The catalog includes the AlgorithmEngineering research task, the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json), and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches upstream tasks on demand. Use a local task folder to work with an existing checkout or a custom task.
-
 | Tasks | Workflow |
 | --- | --- |
-| [AlgorithmEngineering](docs/algorithm-engineering.md) | Design, analyze, implement, and measure competing approaches to an algorithmic problem. |
 | AutoChem, AutoCls2D, AutoCls3D, AutoClsSST, AutoDebug, AutoEAP, AutoMem, AutoMolecule3D, AutoPower, AutoTPPR, AutoTTS | Run the local experiment and read the benchmark's `final_info.json` using the [pinned metric mapping](upstream/task-catalog.json). |
 | AutoTTRL | Supply a local launcher and metric file. Upstream documents an external TTRL launcher and GPU requirements. |
 | AutoDrug | Research the pinned carbon-capture question. The pinned task provides a prompt and references to tools, with no runnable baseline or scoring contract. |

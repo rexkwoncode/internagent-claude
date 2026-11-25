@@ -36,6 +36,9 @@ test('upstream Git submodules match the runtime fetch pins', { skip: !existsSync
 
 test('task catalog and paper routing', () => {
   const catalog = json(invoke(adapter, tmpdir(), 'list'));
+  assert.deepEqual(catalog.localTasks, JSON.parse(readFileSync(join(repo, 'catalog/local-tasks.json'), 'utf8')));
+  assert.deepEqual(catalog.algorithmTasks, JSON.parse(readFileSync(join(repo, 'upstream/task-catalog.json'), 'utf8')));
+  assert.equal(Object.keys(catalog.localTasks).some(id => Object.hasOwn(catalog.algorithmTasks, id)), false);
   assert.equal(Object.keys(catalog.algorithmTasks).length, 13);
   assert.equal(catalog.localTasks.AlgorithmEngineering.mode, 'research-task');
   assert.equal(catalog.localTasks.AlgorithmEngineering.taskType, 'algorithm-engineering');

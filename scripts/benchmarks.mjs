@@ -8,9 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const script = fileURLToPath(import.meta.url);
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
-const catalog = read(new URL('../upstream/task-catalog.json', import.meta.url));
-const localTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode === 'research-task'));
-const algorithmTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode !== 'research-task'));
+const localTasks = read(new URL('../catalog/local-tasks.json', import.meta.url));
+const algorithmTasks = read(new URL('../upstream/task-catalog.json', import.meta.url));
 const papers = read(new URL('../upstream/researchclawbench-task-index.json', import.meta.url));
 const defaults = {
   argv: ['bash', '{launcher}'],

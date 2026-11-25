@@ -1,0 +1,12 @@
+{
+  "AlgorithmEngineering": {
+    "topic": "Design, analyze, implement, and evaluate algorithms for a research problem",
+    "mode": "research-task",
+    "taskType": "algorithm-engineering",
+    "demoTaskSpec": "examples/algorithm-engineering/task.json",
+    "references": [
+      "https://doi.org/10.1007/978-3-642-03456-5_22",
+      "https://jshun.csail.mit.edu/6506-s23/"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "internagent",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Design, run, and reproduce research experiments with Claude Code.",
   "author": {
     "name": "InternAgent Claude Code Port"
