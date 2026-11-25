@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(import.meta.url);
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const catalog = read(new URL('../upstream/task-catalog.json', import.meta.url));
-const localTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode === 'bundled'));
-const algorithmTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode !== 'bundled'));
+const localTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode === 'research-task'));
+const algorithmTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode !== 'research-task'));
 const papers = read(new URL('../upstream/researchclawbench-task-index.json', import.meta.url));
 const defaults = {
   argv: ['bash', '{launcher}'],
@@ -177,7 +177,7 @@ async function main([command, source, destination, options]) {
   if (command === 'list') return { algorithmTasks, paperTasks: papers, localTasks };
   if (command === 'bundled' && Object.hasOwn(localTasks, source)) {
     const task = localTasks[source];
-    const taskSpec = fileURLToPath(new URL('../' + task.taskSpec, import.meta.url));
+    const taskSpec = fileURLToPath(new URL('../' + task.demoTaskSpec, import.meta.url));
     if (!existsSync(taskSpec)) throw new Error('Bundled task spec is missing: ' + taskSpec);
     return { ...task, taskSpec };
   }

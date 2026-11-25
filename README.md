@@ -93,16 +93,17 @@ claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permi
 
 ```text
 /internagent:discover list
-/internagent:discover AlgorithmEngineering
+/internagent:discover AlgorithmEngineering Compare stable sorting strategies on partially ordered data
+/internagent:discover AlgorithmEngineering demo
 /internagent:discover AutoDebug
 /internagent:discover Astronomy_000
 ```
 
-The catalog includes a bundled AlgorithmEngineering task, the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json), and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches upstream tasks on demand. Use a local task folder to work with an existing checkout or a custom task.
+The catalog includes the AlgorithmEngineering research task, the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json), and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches upstream tasks on demand. Use a local task folder to work with an existing checkout or a custom task.
 
 | Tasks | Workflow |
 | --- | --- |
-| AlgorithmEngineering | Compare exact BFS implementations on fixed graph workloads. Candidates pass a correctness check before timing on each split. |
+| AlgorithmEngineering | Start from an algorithmic question or prepared spec. Design, analyze, implement, measure, and revise competing approaches. |
 | AutoChem, AutoCls2D, AutoCls3D, AutoClsSST, AutoDebug, AutoEAP, AutoMem, AutoMolecule3D, AutoPower, AutoTPPR, AutoTTS | Run the local experiment and read the benchmark's `final_info.json` using the [pinned metric mapping](upstream/task-catalog.json). |
 | AutoTTRL | Supply a local launcher and metric file. Upstream documents an external TTRL launcher and GPU requirements. |
 | AutoDrug | Research the pinned carbon-capture question. The pinned task provides a prompt and references to tools, with no runnable baseline or scoring contract. |
@@ -131,9 +132,11 @@ For a machine-specific launcher, pass an options JSON file as the second argumen
 
 ### Algorithm engineering
 
-The [bundled task](examples/algorithm-engineering/) follows the theory-to-measurement approach of [MIT 6.506 Algorithm Engineering](https://jshun.csail.mit.edu/6506-s23/). It compares BFS candidates on wide, sparse, and chain graphs, with warmups, repeated measurements, and different holdout inputs. The report distinguishes complexity claims from observed performance.
+Pass an objective or a prepared task spec to `/internagent:discover AlgorithmEngineering`. With no arguments, the workflow uses the research problem from your project or asks you to choose one. It establishes a testable hypothesis, realistic input families and a machine model, correctness criteria, and a reproducible measurement protocol. Each round uses the measured results to inform the next design. The workflow applies to problems such as sorting, graph algorithms, indexing, compression, parallel algorithms, and external-memory algorithms. [Peter Sanders’s methodology](https://doi.org/10.1007/978-3-642-03456-5_22) · [MIT 6.506](https://jshun.csail.mit.edu/6506-s23/)
 
-For your own algorithm, start from that task spec and replace the seed, correctness command, and measurement commands. Set `"type": "algorithm-engineering"` and provide `correctness` as an executable and argument array. The runner checks correctness before scoring both validation and holdout. A nonzero exit excludes the candidate from ranking. Performance commands can report runtime, throughput, memory, or another numeric metric using the same contract as other tasks.
+Use `/internagent:discover AlgorithmEngineering demo` to run the [BFS example](examples/algorithm-engineering/). It compares graph traversal implementations on wide, sparse, and chain graphs with warmups, repeated measurements, and different holdout inputs.
+
+For a prepared task, set `"type": "algorithm-engineering"` and provide `correctness` as an executable and argument array. The runner checks correctness before scoring both validation and holdout. A nonzero exit excludes the candidate from ranking. Measurement commands can report runtime, throughput, memory, or another numeric metric using the same contract as other tasks.
 
 ## Prepare a model task
 
