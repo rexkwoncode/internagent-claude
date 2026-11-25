@@ -1,6 +1,6 @@
 ---
 name: research
-description: Research an explicit scientific or ML question, including an InternAgent discovery task that needs literature evidence.
+description: Research an explicit scientific or technical question, including an InternAgent discovery task that needs literature evidence.
 argument-hint: "<research question>"
 ---
 

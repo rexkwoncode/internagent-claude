@@ -5,22 +5,23 @@
 [![Tests](https://github.com/rexkwoncode/internagent-claude/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/rexkwoncode/internagent-claude/actions/workflows/tests.yml)
 [![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-3967BD?style=flat-square)](LICENSE)
 
-**Build, compare, and refine ML models from a Claude Code session.** Start with a local dataset and an objective. Claude proposes and implements candidates, and a local runner records their scores and keeps the run resumable. Use your existing Claude subscription sign-in with no API key.
+**Design, run, and reproduce research experiments in Claude Code.** Start with a question, an implementation to compare, or a paper to reproduce. InternAgent helps define the experiment, test hypotheses, and retain the evidence so you can resume. Use your existing Claude subscription sign-in with no API key.
 
-[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Upstream tasks](#upstream-task-catalog) · [Your own task](#prepare-a-model-task) · [Model settings](#persistent-model-settings) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Task catalog](#task-catalog) · [Your own task](#prepare-an-experiment) · [Agent models](#persistent-model-settings) · [Contributing](#contributing)
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    Task["Objective + dataset"] --> Baseline["Score baseline"]
+    Task["Question + evaluation plan"] --> Baseline["Measure baseline"]
     Baseline --> Plan["Plan candidate"]
     Plan --> Build["Build or refine"]
     Build --> Score["Run validation"]
     Score -->|Trial budget remains| Plan
     Score -->|Budget used| Review["Review winner"]
-    Review --> Holdout["Evaluate holdout"]
-    Holdout --> Report["Model + report"]
+    Review -->|If configured| Holdout["Evaluate holdout"]
+    Review -->|Without holdout| Report["Implementation + evidence"]
+    Holdout --> Report
 ```
 
 The search starts with independent drafts, refines promising candidates, and can debug failed trials or combine complementary changes. Each trial saves its source, measured score, parent candidates, and evaluator logs. You can resume after closing Claude Code.
@@ -39,7 +40,7 @@ Claude Code handles inference and runs the [plugin's skills](skills/) and [agent
 
 ## Quickstart
 
-Install [Claude Code](https://code.claude.com/docs/en/setup) and [Node.js 20+](https://nodejs.org/). Start Claude Code from your ML project directory, then add the marketplace and install the plugin.
+Install [Claude Code](https://code.claude.com/docs/en/setup) and [Node.js 20+](https://nodejs.org/). Start Claude Code from your project directory, then add the marketplace and install the plugin.
 
 ```text
 /plugin marketplace add https://github.com/rexkwoncode/internagent-claude.git
@@ -56,13 +57,15 @@ claude plugin install internagent --marketplace https://github.com/rexkwoncode/i
 
 For subscription use, check that `claude auth status` reports `authMethod: claude.ai`. If your shell normally sets an Anthropic API key or uses a custom provider, launch from a shell configured for Claude subscription sign-in. The plugin inherits Claude Code's authentication, model, usage limits, and permissions.
 
-Try the bundled example inside Claude Code.
+Try a catalog task, start from your own objective, or ask a research question inside Claude Code.
 
 ```text
-/internagent:run demo
+/internagent:discover AlgorithmEngineering demo
+/internagent:build Compare two priority queue implementations on mixed insert and extract workloads.
+/internagent:research When does a cache-oblivious layout improve search performance?
 ```
 
-One verified five-trial run on the synthetic regression task reduced validation MSE from **10.8818** to **0.00317**, with **0.00339** on the holdout. Candidate choices and scores can vary between runs.
+The catalog demo compares graph traversal implementations. For a machine-learning example, `/internagent:run demo` runs the bundled synthetic regression task.
 
 To update, refresh the marketplace in `/plugin` and update `internagent@internagent-claude` from the Installed tab. For local development, clone the repo and launch `claude --plugin-dir /path/to/internagent-claude`.
 
@@ -71,11 +74,11 @@ To update, refresh the marketplace in `/plugin` and update `internagent@internag
 | Command | What it does |
 | --- | --- |
 | `/internagent:run demo` | Fit a nonlinear synthetic regression with five trials and a fixed holdout. It uses only Node.js for training and scoring. |
-| `/internagent:build <objective, data, target, metric>` | Create a task around a local ML project and execute the search. |
-| `/internagent:run <task.json> [run-directory]` | Search a prepared task and leave the original seed intact. |
+| `/internagent:build <research objective>` | Set up and run an experiment using your question, project, and constraints. |
+| `/internagent:run <task.json> [run-directory]` | Run a prepared experiment using its fixed evaluator and seed. |
 | `/internagent:run resume <run-directory>` | Continue from the recorded trial state in another session. |
-| `/internagent:configure` | Choose and save model defaults interactively. |
-| `/internagent:discover <list\|task-id\|task-folder> [options.json]` | Find and run an upstream discovery or paper task. |
+| `/internagent:configure` | Choose and save Claude agent model defaults interactively. |
+| `/internagent:discover <list\|task-id\|task-folder> [arguments]` | Find and run a catalog task, upstream discovery experiment, or paper reproduction. |
 | `/internagent:research <question>` | Answer a research question and prepare evidence-based hypotheses. |
 | `/internagent:reproduce <task-folder> [output-directory]` | Reproduce a study with local data and map the resulting evidence to the benchmark checklist. |
 
@@ -89,7 +92,9 @@ $runner = 'node "' + $plugin + '/scripts/run.mjs" *'
 claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permission-mode acceptEdits --allowedTools Agent "Bash($runner)" "PowerShell($runner)"
 ```
 
-## Upstream task catalog
+<a name="upstream-task-catalog"></a>
+
+## Task catalog
 
 ```text
 /internagent:discover list
@@ -118,7 +123,7 @@ For a machine-specific launcher, pass an options JSON file as the second argumen
 ```json
 {
   "validation": {
-    "argv": ["C:/ml/env/Scripts/python.exe", "code/experiment.py"],
+    "argv": ["C:/experiments/env/Scripts/python.exe", "code/experiment.py"],
     "cwd": ".",
     "resultFile": "final_info.json",
     "metricPath": ["mse"]
@@ -138,18 +143,22 @@ Use `/internagent:discover AlgorithmEngineering demo` to run the [BFS example](e
 
 For a prepared task, set `"type": "algorithm-engineering"` and provide `correctness` as an executable and argument array. The runner checks correctness before scoring both validation and holdout. A nonzero exit excludes the candidate from ranking. Measurement commands can report runtime, throughput, memory, or another numeric metric using the same contract as other tasks.
 
-## Prepare a model task
+<a name="prepare-a-model-task"></a>
 
-Put `task.json`, the trusted evaluator, and a small `seed` directory in a project folder. Keep datasets, symbolic links, and the Python environment outside the seed. The runner copies the seed and candidate source trees. Example:
+## Prepare an experiment
+
+Put `task.json`, the trusted evaluator, and a small `seed` directory in a project folder. Keep large inputs, symbolic links, and language environments outside the seed. The runner copies the seed and candidate source trees. This example compares the speed of sorting implementations.
 
 ```json
 {
-  "objective": "Predict daily load while preserving time order in validation.",
+  "type": "algorithm-engineering",
+  "objective": "Compare exact sorting implementations on partially ordered inputs.",
   "seed": "seed",
-  "metric": "mae",
+  "metric": "median_ms",
   "direction": "minimize",
-  "validation": ["python", "evaluate.py"],
-  "holdout": ["python", "evaluate.py"],
+  "correctness": ["node", "check.mjs"],
+  "validation": ["node", "measure.mjs"],
+  "holdout": ["node", "measure.mjs"],
   "trials": 6,
   "timeoutSeconds": 600
 }
@@ -159,12 +168,12 @@ Each command is an executable followed by arguments. It runs from the task JSON'
 
 | Variable | Purpose |
 | --- | --- |
-| `INTERNAGENT_CANDIDATE` | Absolute path to the model candidate. |
-| `INTERNAGENT_OUTPUT` | Directory for metrics, model binaries, predictions, and other artifacts for this phase. |
-| `INTERNAGENT_METRICS` | File the evaluator writes with a JSON object such as `{"mae": 1.23}`. The primary value must be finite. |
-| `INTERNAGENT_PHASE` | `validation` or `holdout`. Use this to select the fixed evaluation data. |
+| `INTERNAGENT_CANDIDATE` | Absolute path to the candidate implementation. |
+| `INTERNAGENT_OUTPUT` | Directory for measurements, logs, and artifacts for this phase. |
+| `INTERNAGENT_METRICS` | File the evaluator writes with a JSON object such as `{"median_ms": 1.23}`. The primary value must be finite. |
+| `INTERNAGENT_PHASE` | `validation` or `holdout`. Use this to select the fixed workloads or evaluation inputs. |
 
-The evaluator owns data selection, metrics, and artifact export. The candidate implements the training and inference interface defined by your project. A trusted task can execute regular local project code with the current user permissions. For stable comparisons, keep the evaluator and input datasets fixed during the run. Use an independent holdout command or select a separate holdout with the phase variable.
+The evaluator owns input selection, measurement, and artifact export. The candidate implements the interface under study. A trusted task can execute local project code with the current user permissions. Keep the evaluation protocol and input selection fixed while comparing candidates. If you configure a holdout, run a separate command or use the phase variable to select independent inputs. Ordinary experiments can use the default `experiment` type. Algorithm engineering requires the separate `correctness` command shown above.
 
 The default run directory is `.internagent/runs/<id>` under the current project. Each run contains a seed snapshot, `state.json`, and `trials/<id>/candidate` and `trials/<id>/validation`. The winning trial may also have a `holdout` directory. The Claude Code orchestrator writes `report.md`. Measured validation scores determine the winner. Ties favor the earlier trial. Trial budget includes the baseline and failed trials.
 
@@ -181,7 +190,7 @@ Use one Claude Code session per run. If a process was force-terminated and the r
 
 ## Persistent model settings
 
-Run `/internagent:configure` inside Claude Code to choose a scope, role, and model. InternAgent reads the saved settings automatically when you start a model-building run.
+Run `/internagent:configure` inside Claude Code to choose a scope, role, and Claude model. InternAgent reads the saved settings automatically when you start an experiment.
 
 You can also save this example as `~/.claude/internagent.json` for your user account or as `internagent.config.json` in the project root for a specific project.
 
