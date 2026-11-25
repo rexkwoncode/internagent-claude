@@ -60,12 +60,10 @@ For subscription use, check that `claude auth status` reports `authMethod: claud
 Try a catalog task, start from your own objective, or ask a research question inside Claude Code.
 
 ```text
-/internagent:discover AlgorithmEngineering demo
+/internagent:discover list
 /internagent:build Compare two priority queue implementations on mixed insert and extract workloads.
 /internagent:research When does a cache-oblivious layout improve search performance?
 ```
-
-The catalog demo compares graph traversal implementations. For a machine-learning example, `/internagent:run demo` runs the bundled synthetic regression task.
 
 To update, refresh the marketplace in `/plugin` and update `internagent@internagent-claude` from the Installed tab. For local development, clone the repo and launch `claude --plugin-dir /path/to/internagent-claude`.
 
@@ -98,8 +96,6 @@ claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permi
 
 ```text
 /internagent:discover list
-/internagent:discover AlgorithmEngineering Compare stable sorting strategies on partially ordered data
-/internagent:discover AlgorithmEngineering demo
 /internagent:discover AutoDebug
 /internagent:discover Astronomy_000
 ```
@@ -108,7 +104,7 @@ The catalog includes the AlgorithmEngineering research task, the 13 algorithm ta
 
 | Tasks | Workflow |
 | --- | --- |
-| AlgorithmEngineering | Start from an algorithmic question or prepared spec. Design, analyze, implement, measure, and revise competing approaches. |
+| [AlgorithmEngineering](docs/algorithm-engineering.md) | Design, analyze, implement, and measure competing approaches to an algorithmic problem. |
 | AutoChem, AutoCls2D, AutoCls3D, AutoClsSST, AutoDebug, AutoEAP, AutoMem, AutoMolecule3D, AutoPower, AutoTPPR, AutoTTS | Run the local experiment and read the benchmark's `final_info.json` using the [pinned metric mapping](upstream/task-catalog.json). |
 | AutoTTRL | Supply a local launcher and metric file. Upstream documents an external TTRL launcher and GPU requirements. |
 | AutoDrug | Research the pinned carbon-capture question. The pinned task provides a prompt and references to tools, with no runnable baseline or scoring contract. |
@@ -135,30 +131,20 @@ For a machine-specific launcher, pass an options JSON file as the second argumen
 
 `cwd` and `resultFile` are relative to the candidate's evaluation workspace. A command can use `{launcher}` for the pinned launcher path, `{output}` for the per-evaluation output folder, or `{workspace}` for the evaluation workspace. Set `metric` and `direction` if you need to override the catalog. To configure an independent holdout, add a `holdout` object with its own evaluation command or split arguments. Upstream benchmark scores used to select candidates are reported as search scores.
 
-### Algorithm engineering
-
-Pass an objective or a prepared task spec to `/internagent:discover AlgorithmEngineering`. With no arguments, the workflow uses the research problem from your project or asks you to choose one. It establishes a testable hypothesis, realistic input families and a machine model, correctness criteria, and a reproducible measurement protocol. Each round uses the measured results to inform the next design. The workflow applies to problems such as sorting, graph algorithms, indexing, compression, parallel algorithms, and external-memory algorithms. [Peter Sanders’s methodology](https://doi.org/10.1007/978-3-642-03456-5_22) · [MIT 6.506](https://jshun.csail.mit.edu/6506-s23/)
-
-Use `/internagent:discover AlgorithmEngineering demo` to run the [BFS example](examples/algorithm-engineering/). It compares graph traversal implementations on wide, sparse, and chain graphs with warmups, repeated measurements, and different holdout inputs.
-
-For a prepared task, set `"type": "algorithm-engineering"` and provide `correctness` as an executable and argument array. The runner checks correctness before scoring both validation and holdout. A nonzero exit excludes the candidate from ranking. Measurement commands can report runtime, throughput, memory, or another numeric metric using the same contract as other tasks.
-
 <a name="prepare-a-model-task"></a>
 
 ## Prepare an experiment
 
-Put `task.json`, the trusted evaluator, and a small `seed` directory in a project folder. Keep large inputs, symbolic links, and language environments outside the seed. The runner copies the seed and candidate source trees. This example compares the speed of sorting implementations.
+Put `task.json`, the trusted evaluator, and a small `seed` directory in a project folder. Keep large inputs, symbolic links, and language environments outside the seed. The runner copies the seed and candidate source trees. This example compares simulation error against a reference solution.
 
 ```json
 {
-  "type": "algorithm-engineering",
-  "objective": "Compare exact sorting implementations on partially ordered inputs.",
+  "objective": "Reduce simulation error on a fixed set of test cases.",
   "seed": "seed",
-  "metric": "median_ms",
+  "metric": "rmse",
   "direction": "minimize",
-  "correctness": ["node", "check.mjs"],
-  "validation": ["node", "measure.mjs"],
-  "holdout": ["node", "measure.mjs"],
+  "validation": ["node", "evaluate.mjs"],
+  "holdout": ["node", "evaluate.mjs"],
   "trials": 6,
   "timeoutSeconds": 600
 }
@@ -170,10 +156,10 @@ Each command is an executable followed by arguments. It runs from the task JSON'
 | --- | --- |
 | `INTERNAGENT_CANDIDATE` | Absolute path to the candidate implementation. |
 | `INTERNAGENT_OUTPUT` | Directory for measurements, logs, and artifacts for this phase. |
-| `INTERNAGENT_METRICS` | File the evaluator writes with a JSON object such as `{"median_ms": 1.23}`. The primary value must be finite. |
+| `INTERNAGENT_METRICS` | File the evaluator writes with a JSON object such as `{"rmse": 1.23}`. The primary value must be finite. |
 | `INTERNAGENT_PHASE` | `validation` or `holdout`. Use this to select the fixed workloads or evaluation inputs. |
 
-The evaluator owns input selection, measurement, and artifact export. The candidate implements the interface under study. A trusted task can execute local project code with the current user permissions. Keep the evaluation protocol and input selection fixed while comparing candidates. If you configure a holdout, run a separate command or use the phase variable to select independent inputs. Ordinary experiments can use the default `experiment` type. Algorithm engineering requires the separate `correctness` command shown above.
+The evaluator owns input selection, measurement, and artifact export. The candidate implements the interface under study. A trusted task can execute local project code with the current user permissions. Keep the evaluation protocol and input selection fixed while comparing candidates. If you configure a holdout, run a separate command or use the phase variable to select independent inputs.
 
 The default run directory is `.internagent/runs/<id>` under the current project. Each run contains a seed snapshot, `state.json`, and `trials/<id>/candidate` and `trials/<id>/validation`. The winning trial may also have a `holdout` directory. The Claude Code orchestrator writes `report.md`. Measured validation scores determine the winner. Ties favor the earlier trial. Trial budget includes the baseline and failed trials.
 
