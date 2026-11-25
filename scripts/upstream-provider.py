@@ -1,5 +1,6 @@
 """Adapter for the pinned upstream model factory and its native Claude Code backend."""
 import asyncio
+from copy import deepcopy
 from functools import cache
 import json
 import os
@@ -188,6 +189,18 @@ def load_settings(path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def mlevolve_query_schema(spec):
+    schema = deepcopy(spec.json_schema)
+    # The pinned prompts require null for review fields in these cases,
+    # although upstream's declared schemas omit that type.
+    nullable = {"submit_code_review": "revised_code", "submit_review": "metric"}
+    key = nullable.get(spec.name)
+    if key:
+        field = schema["properties"][key]
+        field["type"] = [field["type"], "null"]
+    return schema
+
+
 def run_mlevolve(checkout, mailbox, args):
     import jsonschema
     import llm
@@ -217,8 +230,9 @@ def run_mlevolve(checkout, mailbox, args):
         system = llm.compile_prompt_to_md(system_message) if system_message else None
         if func_spec is None:
             return mailbox.ask_sync("text", model=model, prompt=prompt, system=system)
-        value = mailbox.ask_sync("json", model=model, prompt=prompt, system=system, schema=func_spec.json_schema)
-        jsonschema.validate(value, func_spec.json_schema)
+        schema = mlevolve_query_schema(func_spec)
+        value = mailbox.ask_sync("json", model=model, prompt=prompt, system=system, schema=schema)
+        jsonschema.validate(value, schema)
         return value
 
     def generate(prompt, cfg, temperature=None, max_tokens=None, stop_tokens=None,
