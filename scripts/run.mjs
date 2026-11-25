@@ -130,7 +130,10 @@ function initialize(specFile, runDir) {
   } finally {
     rmSync(staging, { recursive: true, force: true });
   }
-  return { run: runDir, objective: spec.objective, trialBudget: spec.trials, models: spec.models };
+  return {
+    run: runDir, objective: spec.objective, constraints: spec.constraints,
+    trialBudget: spec.trials, models: spec.models,
+  };
 }
 
 function withLock(lock, lockedMessage, action) {
@@ -183,6 +186,7 @@ function evaluate(runDir, state, trial, phase) {
       INTERNAGENT_PHASE: phase,
       INTERNAGENT_OUTPUT: output,
       INTERNAGENT_METRICS: metricsFile,
+      INTERNAGENT_TIMEOUT_SECONDS: String(state.spec.timeoutSeconds),
     },
     encoding: 'utf8',
     timeout: state.spec.timeoutSeconds * 1000,
@@ -210,6 +214,7 @@ function overview(state) {
   const top = leaderboard(state.trials, state.spec.direction);
   return {
     objective: state.spec.objective,
+    constraints: state.spec.constraints,
     metric: state.spec.metric,
     direction: state.spec.direction,
     models: resolveModels(state.spec.models ?? {}),

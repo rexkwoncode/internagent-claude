@@ -1,8 +1,7 @@
 ---
 name: research
-description: Research an ML question and prepare evidence-backed hypotheses for an InternAgent run.
-argument-hint: "<ML research question>"
-disable-model-invocation: true
+description: Research an explicit scientific or ML question, including an InternAgent discovery task that needs literature evidence.
+argument-hint: "<research question>"
 ---
 
 Research question: $ARGUMENTS

@@ -1,0 +1,84 @@
+{
+  "AutoChem": {
+    "topic": "Chemical reaction yield prediction",
+    "cwd": "code",
+    "argv": ["bash", "{launcher}", "{output}"],
+    "resultFile": "run_output/final_info.json",
+    "metricPath": ["Chemical prediction", "means", "r2_score"],
+    "direction": "maximize"
+  },
+  "AutoCls2D": {
+    "topic": "CIFAR-100 image classification",
+    "metricPath": ["cifar100", "means", "best_acc"],
+    "direction": "maximize"
+  },
+  "AutoCls3D": {
+    "topic": "ModelNet40 point-cloud classification",
+    "cwd": "code",
+    "argv": ["bash", "{launcher}", "{output}"],
+    "resultFile": "run_output/final_info.json",
+    "metricPath": ["modelnet40", "means", "best_oa"],
+    "direction": "maximize"
+  },
+  "AutoClsSST": {
+    "topic": "Sentiment classification",
+    "resultFile": "run_0/final_info.json",
+    "metricPath": ["sentiment", "means", "best_acc"],
+    "direction": "maximize"
+  },
+  "AutoDebug": {
+    "topic": "Synthetic regression",
+    "argv": ["python", "code/experiment.py"],
+    "metricPath": ["mse"],
+    "direction": "minimize"
+  },
+  "AutoDrug": {
+    "topic": "Organocatalyst literature research for carbon capture",
+    "mode": "research"
+  },
+  "AutoEAP": {
+    "topic": "Enhancer activity prediction on the upstream benchmark",
+    "metricPath": ["AutoEAP", "means", "PCC(Dev)"],
+    "numericString": true,
+    "direction": "maximize"
+  },
+  "AutoMem": {
+    "topic": "LoCoMo conversational memory",
+    "metric": "f1",
+    "metricPath": ["locomo10", "f1", "mean"],
+    "direction": "maximize"
+  },
+  "AutoMolecule3D": {
+    "topic": "MD17 energy and force prediction",
+    "metricPath": ["AutoMolecule3D", "means", "Forces MAE"],
+    "numericString": true,
+    "direction": "minimize"
+  },
+  "AutoPower": {
+    "topic": "IEEE39 power-flow estimation",
+    "cwd": "code",
+    "argv": ["bash", "{launcher}", "{output}"],
+    "resultFile": "run_output/final_info.json",
+    "metricPath": ["IEEE39", "means", "val/PQ_Vm_rmse"],
+    "direction": "minimize"
+  },
+  "AutoTPPR": {
+    "topic": "Single-cell perturbation prediction on the upstream benchmark",
+    "cwd": "code",
+    "argv": ["bash", "{launcher}", "{output}"],
+    "resultFile": "run_output/final_info.json",
+    "metricPath": ["Gears", "means", "Test Top 20 DE MSE"],
+    "direction": "minimize"
+  },
+  "AutoTTRL": {
+    "topic": "Test-time reinforcement learning on AIME",
+    "mode": "custom-evaluator",
+    "metric": "accuracy",
+    "direction": "maximize"
+  },
+  "AutoTTS": {
+    "topic": "Test-time scaling on LongBench",
+    "metricPath": ["longbench", "means", "accuracy"],
+    "direction": "maximize"
+  }
+}

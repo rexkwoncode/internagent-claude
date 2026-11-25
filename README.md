@@ -7,7 +7,7 @@
 
 **Build, compare, and refine ML models from a Claude Code session.** Start with a local dataset and an objective. Claude proposes and implements candidates, and a local runner records their scores and keeps the run resumable. Use your existing Claude subscription sign-in with no API key.
 
-[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Your own task](#prepare-a-model-task) · [Model settings](#persistent-model-settings) · [Upstream components](#upstream-components) · [Contributing](#contributing)
+[Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Upstream tasks](#upstream-task-catalog) · [Your own task](#prepare-a-model-task) · [Model settings](#persistent-model-settings) · [Contributing](#contributing)
 
 ## How it works
 
@@ -30,12 +30,12 @@ The search starts with independent drafts, refines promising candidates, and can
 ```mermaid
 flowchart LR
     Claude["Claude Code (subscription)"] --> Plugin["InternAgent plugin"]
-    Plugin <--> Runner["Local runner + MLEvolve-style search"]
+    Plugin <--> Runner["Local experiment runner"]
     Runner <--> Evaluator["Project evaluator"]
     ResearchClaw["ResearchClawBench tasks"] --> Plugin
 ```
 
-Claude Code handles inference and runs the [plugin's skills](skills/) and [agents](agents/). The [local runner](scripts/run.mjs) executes the project's evaluator, persists results, and asks the [native search scheduler](scripts/search.mjs) which experiment to try next. The scheduler adapts MLEvolve's draft, refinement, debugging, and fusion stages. The bundled [upstream Python source](upstream/MLEvolve/) is available separately. The [ResearchClawBench adapter](scripts/upstream.mjs) fetches pinned task inputs for the reproduction skill.
+Claude Code handles inference and runs the [plugin's skills](skills/) and [agents](agents/). InternAgent routes each task to an experiment, literature research, or paper reproduction. For scored experiments, the [local runner](scripts/run.mjs) executes the evaluator and uses the [MLEvolve-style scheduler](scripts/search.mjs) to select candidate experiments. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned algorithm tasks and paper inputs.
 
 ## Quickstart
 
@@ -75,7 +75,8 @@ To update, refresh the marketplace in `/plugin` and update `internagent@internag
 | `/internagent:run <task.json> [run-directory]` | Search a prepared task and leave the original seed intact. |
 | `/internagent:run resume <run-directory>` | Continue from the recorded trial state in another session. |
 | `/internagent:configure` | Choose and save model defaults interactively. |
-| `/internagent:research <question>` | Gather evidence and prepare measurable hypotheses using the available Claude Code research tools. |
+| `/internagent:discover <list\|task-id\|task-folder> [options.json]` | Find and run an upstream discovery or paper task. |
+| `/internagent:research <question>` | Answer a research question and prepare evidence-based hypotheses. |
 | `/internagent:reproduce <task-folder> [output-directory]` | Reproduce a study with local data and map the resulting evidence to the benchmark checklist. |
 
 ### Run from a script
@@ -87,6 +88,44 @@ $plugin = (Resolve-Path "C:/path/to/internagent-claude").Path.Replace('\', '/')
 $runner = 'node "' + $plugin + '/scripts/run.mjs" *'
 claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permission-mode acceptEdits --allowedTools Agent "Bash($runner)" "PowerShell($runner)"
 ```
+
+## Upstream task catalog
+
+```text
+/internagent:discover list
+/internagent:discover AutoDebug
+/internagent:discover Astronomy_000
+```
+
+The catalog covers the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json) and 40 [ResearchClawBench paper tasks](upstream/ResearchClawBench/task-index.json). The plugin fetches the selected task on demand. Use a local task folder to work with an existing checkout or a custom task.
+
+| Tasks | Workflow |
+| --- | --- |
+| AutoChem, AutoCls2D, AutoCls3D, AutoClsSST, AutoDebug, AutoEAP, AutoMem, AutoMolecule3D, AutoPower, AutoTPPR, AutoTTS | Run the local experiment and read the benchmark's `final_info.json` using the [pinned metric mapping](upstream/task-catalog.json). |
+| AutoTTRL | Supply a local launcher and metric file. Upstream documents an external TTRL launcher and GPU requirements. |
+| AutoDrug | Research the pinned carbon-capture question. The pinned task provides a prompt and references to tools, with no runnable baseline or scoring contract. |
+| ResearchClawBench task IDs | Reproduce the paper and review the artifacts against its checklist. |
+
+Each task has its own dependencies, such as datasets, checkpoints, Python packages, GPUs, or local inference servers. Some upstream evaluators expect a separate inference endpoint. Claude subscription sign-in covers the plugin agents. Use the task's upstream README to set up the evaluator.
+
+The pinned AutoMolecule3D launcher references a ViSNet YAML file supplied outside its code snapshot. Point the validation command at a local copy when preparing that task.
+
+For a machine-specific launcher, pass an options JSON file as the second argument to `/internagent:discover`. For example, this uses the upstream AutoDebug experiment in a local Python environment.
+
+```json
+{
+  "validation": {
+    "argv": ["C:/ml/env/Scripts/python.exe", "code/experiment.py"],
+    "cwd": ".",
+    "resultFile": "final_info.json",
+    "metricPath": ["mse"]
+  },
+  "trials": 3,
+  "timeoutSeconds": 120
+}
+```
+
+`cwd` and `resultFile` are relative to the candidate's evaluation workspace. A command can use `{launcher}` for the pinned launcher path, `{output}` for the per-evaluation output folder, or `{workspace}` for the evaluation workspace. Set `metric` and `direction` if you need to override the catalog. To configure an independent holdout, add a `holdout` object with its own evaluation command or split arguments. Upstream benchmark scores used to select candidates are reported as search scores.
 
 ## Prepare a model task
 

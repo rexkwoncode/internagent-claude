@@ -12,16 +12,17 @@ function git(cwd, ...args) {
 }
 
 function main([name, destination, task]) {
+  const markers = { InternAgent: 'prompt.json', ResearchClawBench: 'task_info.json' };
   if (!Object.hasOwn(sources, name) || !destination || (task &&
-      (name !== 'ResearchClawBench' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(task)))) {
-    throw new Error('Usage: upstream.mjs <InternAgent|MLEvolve|ResearchClawBench> <destination> [ResearchClawBench-task]');
+      (!Object.hasOwn(markers, name) || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(task)))) {
+    throw new Error('Usage: upstream.mjs <InternAgent|MLEvolve|ResearchClawBench> <destination> [task-id]');
   }
   const { url, commit } = sources[name];
   const target = resolve(destination);
   try {
     statSync(target);
     if (git(target, 'rev-parse', 'HEAD') !== commit) throw new Error('Destination exists at a different revision.');
-    if (task) statSync(join(target, 'tasks', task, 'task_info.json'));
+    if (task) statSync(join(target, 'tasks', task, markers[name]));
     return target;
   } catch (error) {
     if (error.code !== 'ENOENT' || error.path !== target) throw error;
@@ -38,7 +39,7 @@ function main([name, destination, task]) {
     if (task) git(temporary, 'sparse-checkout', 'set', 'tasks/' + task);
     git(temporary, 'checkout', '-q', '--detach', 'FETCH_HEAD');
     if (git(temporary, 'rev-parse', 'HEAD') !== commit) throw new Error('Fetched revision did not match the pin.');
-    if (task) statSync(join(temporary, 'tasks', task, 'task_info.json'));
+    if (task) statSync(join(temporary, 'tasks', task, markers[name]));
     renameSync(temporary, target);
     return target;
   } finally {
