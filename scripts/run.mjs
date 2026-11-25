@@ -11,6 +11,7 @@ import { choose, leaderboard } from './search.mjs';
 
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const modelRoles = ['planner', 'builder', 'reviewer'];
+const modelKeys = ['default', ...modelRoles];
 const modelAliases = ['inherit', 'haiku', 'sonnet', 'opus', 'fable'];
 
 function validateModels(models, label = 'models') {
@@ -18,7 +19,7 @@ function validateModels(models, label = 'models') {
     throw new Error(label + ' must be an object.');
   }
   for (const [role, alias] of Object.entries(models)) {
-    if (role !== 'default' && !modelRoles.includes(role)) throw new Error('Unknown ' + label + ' key: ' + role);
+    if (!modelKeys.includes(role)) throw new Error('Unknown ' + label + ' key: ' + role);
     if (!modelAliases.includes(alias)) {
       throw new Error(label + '.' + role + ' must be one of: ' + modelAliases.join(', '));
     }
@@ -26,14 +27,21 @@ function validateModels(models, label = 'models') {
   return models;
 }
 
-function readModelSettings(file) {
+function readModelConfig(file) {
   try {
-    return validateModels(read(file)?.models, 'models in ' + file);
+    const config = read(file);
+    validateModels(config?.models, 'models in ' + file);
+    return config;
   } catch (error) {
-    if (error.code === 'ENOENT') return {};
+    if (error.code === 'ENOENT') return { models: {} };
     if (error instanceof SyntaxError) throw new Error('Invalid JSON in ' + file + ': ' + error.message);
     throw error;
   }
+}
+
+function configPaths() {
+  const user = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
+  return { project: resolve('internagent.config.json'), user: resolve(user, 'internagent.json') };
 }
 
 function resolveModels(...layers) {
@@ -45,9 +53,25 @@ function resolveModels(...layers) {
 
 function effectiveModels(taskModels) {
   const task = taskModels === undefined ? {} : validateModels(taskModels);
-  const user = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
-  return resolveModels(task, readModelSettings(resolve('internagent.config.json')),
-    readModelSettings(resolve(user, 'internagent.json')));
+  const { project, user } = configPaths();
+  return resolveModels(task, readModelConfig(project).models, readModelConfig(user).models);
+}
+
+function configure(scope, role, alias) {
+  if (!['user', 'project'].includes(scope) || !modelKeys.includes(role) ||
+      (alias !== 'clear' && !modelAliases.includes(alias))) {
+    throw new Error('Usage: run.mjs configure <user|project> <default|planner|builder|reviewer> <' +
+      [...modelAliases, 'clear'].join('|') + '>');
+  }
+  const file = configPaths()[scope];
+  mkdirSync(dirname(file), { recursive: true });
+  return withLock(file + '.lock', 'Model config is locked by another write.', () => {
+    const config = readModelConfig(file);
+    if (alias === 'clear') delete config.models[role];
+    else config.models[role] = alias;
+    save(file, config);
+    return { file, scope, models: config.models };
+  });
 }
 
 function save(file, value) {
@@ -109,19 +133,17 @@ function initialize(specFile, runDir) {
   return { run: runDir, objective: spec.objective, trialBudget: spec.trials, models: spec.models };
 }
 
-function withLock(runDir, action) {
-  const lock = join(runDir, '.lock');
+function withLock(lock, lockedMessage, action) {
   let descriptor;
   try {
     descriptor = openSync(lock, 'wx');
   } catch (error) {
-    if (error.code === 'EEXIST') throw new Error('Run is locked. See README for interrupted-run recovery.');
+    if (error.code === 'EEXIST') throw new Error(lockedMessage);
     throw error;
   }
   try {
     writeFileSync(descriptor, String(process.pid));
-    const stateFile = join(runDir, 'state.json');
-    return action(read(stateFile), state => save(stateFile, state));
+    return action();
   } finally {
     closeSync(descriptor);
     rmSync(lock);
@@ -201,19 +223,23 @@ function overview(state) {
 }
 
 function main([command, pathArg, another, note]) {
+  if (command === 'configure') return configure(pathArg, another, note);
   if (command === 'models') return effectiveModels(pathArg ? read(resolve(pathArg))?.models : undefined);
   if (command === 'recall' && pathArg && another) {
     return recall(resolve(pathArg), another, note ? resolve(note) : undefined);
   }
   if (!['init', 'status', 'next', 'evaluate', 'finish'].includes(command) || !pathArg ||
       (['init', 'evaluate'].includes(command) && !another)) {
-    throw new Error('Usage: run.mjs init <task.json> <run> | models [task.json] | status <run> | next <run> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
+    throw new Error('Usage: run.mjs init <task.json> <run> | models [task.json] | configure <scope> <role> <alias> | status <run> | next <run> | evaluate <run> <id> [note] | finish <run> | recall <runs-root> <objective> [current-run]');
   }
   const runDir = resolve(command === 'init' ? another : pathArg);
   if (command === 'init') return initialize(resolve(pathArg), runDir);
   if (command === 'status') return overview(read(join(runDir, 'state.json')));
 
-  return withLock(runDir, (state, persist) => {
+  return withLock(join(runDir, '.lock'), 'Run is locked. See README for interrupted-run recovery.', () => {
+    const stateFile = join(runDir, 'state.json');
+    const state = read(stateFile);
+    const persist = () => save(stateFile, state);
     let trial = state.trials.find(t => t.status === 'pending');
     if (command === 'next') {
       if (state.final) return { done: true, final: state.final };
@@ -225,7 +251,7 @@ function main([command, pathArg, another, note]) {
           ...suggestion, status: 'pending',
         };
         state.trials.push(trial);
-        persist(state);
+        persist();
       }
       return {
         ...trial,
@@ -236,7 +262,7 @@ function main([command, pathArg, another, note]) {
     if (command === 'evaluate') {
       if (!trial || trial.id !== another) throw new Error('Evaluate the current pending trial returned by next.');
       Object.assign(trial, evaluate(runDir, state, trial, 'validation'), { note: note ?? '' });
-      persist(state);
+      persist();
       return trial;
     }
     if (state.final && state.final.holdout?.status !== 'failed') return state.final;
@@ -252,7 +278,7 @@ function main([command, pathArg, another, note]) {
       validation: best.score,
       holdout: state.spec.holdout ? evaluate(runDir, state, best, 'holdout') : null,
     };
-    persist(state);
+    persist();
     return state.final;
   });
 }

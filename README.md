@@ -74,6 +74,7 @@ To update, refresh the marketplace in `/plugin` and update `internagent@internag
 | `/internagent:build <objective, data, target, metric>` | Create a task around a local ML project and execute the search. |
 | `/internagent:run <task.json> [run-directory]` | Search a prepared task and leave the original seed intact. |
 | `/internagent:run resume <run-directory>` | Continue from the recorded trial state in another session. |
+| `/internagent:configure` | Choose and save model defaults interactively. |
 | `/internagent:research <question>` | Gather evidence and prepare measurable hypotheses using the available Claude Code research tools. |
 | `/internagent:reproduce <task-folder> [output-directory]` | Reproduce a study with local data and map the resulting evidence to the benchmark checklist. |
 
@@ -130,7 +131,9 @@ Use one Claude Code session per run. If a process was force-terminated and the r
 
 ## Persistent model settings
 
-Set your model preferences once. InternAgent reads them automatically when you start a model-building run. Save this example as `~/.claude/internagent.json` for your user account or as `internagent.config.json` in the project root for a specific project.
+Run `/internagent:configure` inside Claude Code to choose a scope, role, and model. InternAgent reads the saved settings automatically when you start a model-building run.
+
+You can also save this example as `~/.claude/internagent.json` for your user account or as `internagent.config.json` in the project root for a specific project.
 
 ```json
 {

@@ -26,11 +26,20 @@ test('persistent model policy precedence, validation, and resume', () => {
     const writeSpec = value => writeFileSync(file, JSON.stringify(value));
     mkdirSync(join(working, 'seed'));
     mkdirSync(userDir);
-    writeFileSync(userFile, JSON.stringify({ models: { default: 'haiku', builder: 'sonnet' } }));
-    writeFileSync(projectFile, JSON.stringify({ models: { reviewer: 'inherit' } }));
+    const user = cli('configure', 'user', 'default', 'haiku');
+    assert.equal(user.status, 0, user.stderr);
+    assert.equal(cli('configure', 'user', 'builder', 'sonnet').status, 0);
+    assert.equal(cli('configure', 'project', 'reviewer', 'inherit').status, 0);
+    assert.equal(cli('configure', 'project', 'builder', 'invalid').status, 1);
+    assert.deepEqual(JSON.parse(readFileSync(userFile, 'utf8')).models, {
+      default: 'haiku', builder: 'sonnet',
+    });
     assert.deepEqual(JSON.parse(cli('models').stdout), {
       planner: 'haiku', builder: 'sonnet', reviewer: 'inherit',
     });
+    assert.equal(cli('configure', 'project', 'reviewer', 'clear').status, 0);
+    assert.equal(JSON.parse(cli('models').stdout).reviewer, 'haiku');
+    assert.equal(cli('configure', 'project', 'reviewer', 'inherit').status, 0);
     for (const [models, message] of [
       [null, /models must be an object/],
       [{ coder: 'haiku' }, /Unknown models key: coder/],

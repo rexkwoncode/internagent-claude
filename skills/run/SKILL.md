@@ -8,6 +8,8 @@ Arguments: $ARGUMENTS
 
 Use the user's Claude Code session and the native internagent:planner, internagent:builder, and internagent:reviewer agents. Use this skill when the user requests a run, build, or resume. Perform the run during this session. Call the runner from the project root so it can find persistent project settings. Runner: node "${CLAUDE_PLUGIN_ROOT}/scripts/run.mjs".
 
+Run each runner command as its own shell tool call with the literal quoted script path. Shell variables, pipelines, and compound calls can require extra permissions in scripted sessions.
+
 Use the resolved `models` map returned by the runner's init or status for every Agent call for this task. For each planner, builder, or reviewer invocation, set the Agent tool's `model` argument to the corresponding alias. For `inherit`, omit the argument so the agent uses the current session model. Passing an alias in prompt text does not select it. If an explicit alias is configured and the Agent tool lacks a model argument, rejects the alias, or reports a replacement, stop and report the issue. Keep the configured policy on resume.
 
 1. For a task JSON, inspect the objective, seed, evaluator invocation, resource budget, and candidate contract. Use the supplied run directory or choose a fresh .internagent/runs/<id>. For demo, use "${CLAUDE_PLUGIN_ROOT}/examples/regression/task.json"; use five trials to minimize MSE, with train(rows) returning predict(x). The target may be nonlinear. The bundled path can go directly to init, which returns the task summary. Leave evaluator fixtures and coefficients unread by the builder and planner. For resume, the second argument is the existing run directory. Quote every path as a separate shell argument.
