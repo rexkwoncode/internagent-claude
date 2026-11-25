@@ -9,6 +9,8 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(import.meta.url);
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const catalog = read(new URL('../upstream/task-catalog.json', import.meta.url));
+const localTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode === 'bundled'));
+const algorithmTasks = Object.fromEntries(Object.entries(catalog).filter(([, task]) => task.mode !== 'bundled'));
 const papers = read(new URL('../upstream/researchclawbench-task-index.json', import.meta.url));
 const defaults = {
   argv: ['bash', '{launcher}'],
@@ -21,7 +23,7 @@ function inspect(folder) {
   const prompt = join(folder, 'prompt.json');
   if (!existsSync(prompt)) throw new Error('Expected prompt.json or task_info.json in ' + folder);
   const id = basename(folder);
-  const profile = Object.hasOwn(catalog, id) ? catalog[id] : {};
+  const profile = Object.hasOwn(algorithmTasks, id) ? algorithmTasks[id] : {};
   return { id, folder, prompt, ...profile, mode: profile.mode ?? (profile.metricPath ? 'benchmark' : 'custom-evaluator') };
 }
 
@@ -172,13 +174,19 @@ async function evaluate(configFile) {
 }
 
 async function main([command, source, destination, options]) {
-  if (command === 'list') return { algorithmTasks: catalog, paperTasks: papers };
+  if (command === 'list') return { algorithmTasks, paperTasks: papers, localTasks };
+  if (command === 'bundled' && Object.hasOwn(localTasks, source)) {
+    const task = localTasks[source];
+    const taskSpec = fileURLToPath(new URL('../' + task.taskSpec, import.meta.url));
+    if (!existsSync(taskSpec)) throw new Error('Bundled task spec is missing: ' + taskSpec);
+    return { ...task, taskSpec };
+  }
   if (command === 'inspect' && source) return inspect(resolve(source));
   if (command === 'prepare' && source && destination) {
     return prepare(resolve(source), resolve(destination), options ? read(resolve(options)) : undefined);
   }
   if (command === 'evaluate' && source) return evaluate(resolve(source));
-  throw new Error('Usage: benchmarks.mjs list | inspect <task-folder> | prepare <task-folder> <destination> [options.json]');
+  throw new Error('Usage: benchmarks.mjs list | bundled <task-id> | inspect <task-folder> | prepare <task-folder> <destination> [options.json]');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === script) {

@@ -1,0 +1,17 @@
+{
+  "type": "algorithm-engineering",
+  "objective": "Reduce the runtime of single-source breadth-first search on directed, unweighted graphs. Keep traverse(graph, start) compatible with the existing interface and return exact distances, with -1 for unreachable vertices.",
+  "constraints": [
+    "Leave the input graph unchanged.",
+    "Keep exact distances for all valid sources and directed graphs.",
+    "Use only the Node.js standard library."
+  ],
+  "seed": "seed",
+  "metric": "median_ms",
+  "direction": "minimize",
+  "correctness": ["node", "benchmark.mjs", "check"],
+  "validation": ["node", "benchmark.mjs", "measure"],
+  "holdout": ["node", "benchmark.mjs", "measure"],
+  "trials": 4,
+  "timeoutSeconds": 60
+}

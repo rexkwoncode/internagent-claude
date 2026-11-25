@@ -1,4 +1,10 @@
 {
+  "AlgorithmEngineering": {
+    "topic": "Algorithm engineering research on graph traversal",
+    "mode": "bundled",
+    "taskSpec": "examples/algorithm-engineering/task.json",
+    "reference": "https://jshun.csail.mit.edu/6506-s23/"
+  },
   "AutoChem": {
     "topic": "Chemical reaction yield prediction",
     "cwd": "code",

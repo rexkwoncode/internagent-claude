@@ -93,14 +93,16 @@ claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permi
 
 ```text
 /internagent:discover list
+/internagent:discover AlgorithmEngineering
 /internagent:discover AutoDebug
 /internagent:discover Astronomy_000
 ```
 
-The catalog covers the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json) and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches the selected task on demand. Use a local task folder to work with an existing checkout or a custom task.
+The catalog includes a bundled AlgorithmEngineering task, the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json), and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches upstream tasks on demand. Use a local task folder to work with an existing checkout or a custom task.
 
 | Tasks | Workflow |
 | --- | --- |
+| AlgorithmEngineering | Compare exact BFS implementations on fixed graph workloads. Candidates pass a correctness check before timing on each split. |
 | AutoChem, AutoCls2D, AutoCls3D, AutoClsSST, AutoDebug, AutoEAP, AutoMem, AutoMolecule3D, AutoPower, AutoTPPR, AutoTTS | Run the local experiment and read the benchmark's `final_info.json` using the [pinned metric mapping](upstream/task-catalog.json). |
 | AutoTTRL | Supply a local launcher and metric file. Upstream documents an external TTRL launcher and GPU requirements. |
 | AutoDrug | Research the pinned carbon-capture question. The pinned task provides a prompt and references to tools, with no runnable baseline or scoring contract. |
@@ -126,6 +128,12 @@ For a machine-specific launcher, pass an options JSON file as the second argumen
 ```
 
 `cwd` and `resultFile` are relative to the candidate's evaluation workspace. A command can use `{launcher}` for the pinned launcher path, `{output}` for the per-evaluation output folder, or `{workspace}` for the evaluation workspace. Set `metric` and `direction` if you need to override the catalog. To configure an independent holdout, add a `holdout` object with its own evaluation command or split arguments. Upstream benchmark scores used to select candidates are reported as search scores.
+
+### Algorithm engineering
+
+The [bundled task](examples/algorithm-engineering/) follows the theory-to-measurement approach of [MIT 6.506 Algorithm Engineering](https://jshun.csail.mit.edu/6506-s23/). It compares BFS candidates on wide, sparse, and chain graphs, with warmups, repeated measurements, and different holdout inputs. The report distinguishes complexity claims from observed performance.
+
+For your own algorithm, start from that task spec and replace the seed, correctness command, and measurement commands. Set `"type": "algorithm-engineering"` and provide `correctness` as an executable and argument array. The runner checks correctness before scoring both validation and holdout. A nonzero exit excludes the candidate from ranking. Performance commands can report runtime, throughput, memory, or another numeric metric using the same contract as other tasks.
 
 ## Prepare a model task
 

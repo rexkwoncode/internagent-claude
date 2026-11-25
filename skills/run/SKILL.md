@@ -1,6 +1,6 @@
 ---
 name: run
-description: Execute model search when the user requests an experiment run or internagent:build prepares a task.
+description: Execute candidate search when the user requests an experiment run or another InternAgent skill prepares a task.
 argument-hint: "<task.json|demo|resume> [run-directory]"
 ---
 
@@ -14,6 +14,9 @@ Use the resolved `models` map returned by the runner's init or status for every 
 
 1. For a task JSON, inspect the objective, constraints, seed, evaluator invocation, resource budget, and candidate contract. Include task constraints in the planner and builder delegations and preserve them on resume. Use the supplied run directory or choose a fresh .internagent/runs/<id>. For demo, use "${CLAUDE_PLUGIN_ROOT}/examples/regression/task.json"; use five trials to minimize MSE, with train(rows) returning predict(x). The target may be nonlinear. The bundled path can go directly to init, which returns the task summary. Leave evaluator fixtures and coefficients unread by the builder and planner. For resume, the second argument is the existing run directory. Quote every path as a separate shell argument.
 2. Initialize with `init <task.json> <run>` once. For a resume or after compaction, read `status <run>` and the run's state and prior notes. Skip init if resuming. Use `recall .internagent/runs "<objective>" "<current-run>"` to retrieve related trial notes and supply useful evidence to the planner. Treat historical scores as comparable only when their evaluator and split match.
+
+For `algorithm-engineering` tasks, frame hypotheses around algorithmic work, representation, locality, or parallelism as appropriate. Give the builder the correctness contract before asking for performance changes. A candidate must pass the fixed correctness check before timing. Keep inputs, warmups, repetitions, and hardware settings fixed for comparisons. In the report distinguish asymptotic analysis from measured performance, include per-workload evidence and machine/runtime details when available, and qualify speedups when variation is large. Compare holdout scores only against measurements on the same holdout workload.
+
 3. Until done, run `next <run>`. It returns a pending trial ID, its mode, its writable candidate directory, and its parents. Run the baseline unchanged. For drafts, ask the planner for distinct hypotheses from the available training and task description. For improve, debug, and fusion, supply the parent lineage and validation records. For fusion, give the builder both parent paths. For every non-baseline trial delegate to internagent:builder with the assigned path and precise hypothesis. If a resumed pending candidate already contains work, inspect it before editing further. Preserve previous trial trees, evaluator, task spec, original project, and holdout.
 4. Run `evaluate <run> <id> "<one-line hypothesis and implementation>"`. Use the runner's machine-recorded score and logs. Do not handwrite metrics. A failed trial consumes one slot, and the runner may schedule a debug child. Stop on baseline failure and report the logs. Keep going on candidate failures within the trial budget.
 5. Ask internagent:reviewer to audit the proposed winning candidate and validation evidence. If the audit shows an invalid comparison, report it and start a corrected run only if authorized. Otherwise run `finish <run>`, which holds candidate selection fixed and optionally evaluates the configured holdout. Distinguish a failed holdout from a successful final measurement. Do not tune from the holdout.

@@ -90,6 +90,12 @@ function validate(spec) {
       (spec.holdout !== undefined && !argv(spec.holdout))) {
     throw new Error('Specify objective, seed, metric, direction, validation argv, and optional holdout argv.');
   }
+  if (spec.type !== undefined && spec.type !== 'experiment' && spec.type !== 'algorithm-engineering') {
+    throw new Error('Task type must be experiment or algorithm-engineering.');
+  }
+  if (spec.type === 'algorithm-engineering' && !argv(spec.correctness)) {
+    throw new Error('An algorithm-engineering task requires a correctness command as an argv array.');
+  }
   for (const [key, max, fallback] of [['trials', 1000, 6], ['timeoutSeconds', 86400, 300]]) {
     spec[key] ??= fallback;
     if (!Number.isInteger(spec[key]) || spec[key] < 1 || spec[key] > max) {
@@ -131,7 +137,7 @@ function initialize(specFile, runDir) {
     rmSync(staging, { recursive: true, force: true });
   }
   return {
-    run: runDir, objective: spec.objective, constraints: spec.constraints,
+    run: runDir, objective: spec.objective, type: spec.type ?? 'experiment', constraints: spec.constraints,
     trialBudget: spec.trials, models: spec.models,
   };
 }
@@ -173,12 +179,12 @@ function prepare(runDir, trial) {
 }
 
 function evaluate(runDir, state, trial, phase) {
-  const [exe, ...args] = state.spec[phase];
   const output = join(runDir, 'trials', trial.id, phase);
   mkdirSync(output, { recursive: true });
   const metricsFile = join(output, 'metrics.json');
   rmSync(metricsFile, { force: true });
-  const child = spawnSync(exe, args, {
+  const deadline = performance.now() + state.spec.timeoutSeconds * 1000;
+  const options = {
     cwd: state.taskDir,
     env: {
       ...process.env,
@@ -186,20 +192,35 @@ function evaluate(runDir, state, trial, phase) {
       INTERNAGENT_PHASE: phase,
       INTERNAGENT_OUTPUT: output,
       INTERNAGENT_METRICS: metricsFile,
-      INTERNAGENT_TIMEOUT_SECONDS: String(state.spec.timeoutSeconds),
     },
     encoding: 'utf8',
-    timeout: state.spec.timeoutSeconds * 1000,
     killSignal: 'SIGKILL',
     maxBuffer: 8 * 1024 * 1024,
     windowsHide: true,
-  });
-  writeFileSync(join(output, 'stdout.log'), child.stdout ?? '');
-  writeFileSync(join(output, 'stderr.log'), child.stderr ?? '');
-  const result = { status: 'failed', score: null, output };
-  try {
+  };
+  function execute([exe, ...args], prefix) {
+    const remaining = Math.ceil(deadline - performance.now());
+    if (remaining <= 0) throw new Error('Evaluation exhausted its time budget.');
+    const child = spawnSync(exe, args, {
+      ...options, timeout: remaining,
+      env: { ...options.env, INTERNAGENT_TIMEOUT_SECONDS: String(remaining / 1000) },
+    });
+    writeFileSync(join(output, prefix + 'stdout.log'), child.stdout ?? '');
+    writeFileSync(join(output, prefix + 'stderr.log'), child.stderr ?? '');
     if (child.error) throw child.error;
     if (child.status !== 0) throw new Error('Evaluator exited with ' + (child.signal ?? child.status));
+  }
+  const result = { status: 'failed', score: null, output };
+  try {
+    if (state.spec.type === 'algorithm-engineering') {
+      try {
+        execute(state.spec.correctness, 'correctness.');
+      } catch (error) {
+        throw new Error('Correctness check failed: ' + error.message);
+      }
+      rmSync(metricsFile, { force: true });
+    }
+    execute(state.spec[phase], '');
     const metrics = read(metricsFile);
     const score = Object.hasOwn(metrics, state.spec.metric) ? metrics[state.spec.metric] : null;
     if (!Number.isFinite(score)) throw new Error('Expected a finite number for metric ' + state.spec.metric);
@@ -214,6 +235,7 @@ function overview(state) {
   const top = leaderboard(state.trials, state.spec.direction);
   return {
     objective: state.spec.objective,
+    type: state.spec.type ?? 'experiment',
     constraints: state.spec.constraints,
     metric: state.spec.metric,
     direction: state.spec.direction,

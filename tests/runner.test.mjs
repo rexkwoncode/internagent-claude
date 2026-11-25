@@ -8,6 +8,60 @@ import { test } from 'node:test';
 
 const runner = fileURLToPath(new URL('../scripts/run.mjs', import.meta.url));
 
+test('algorithm engineering rejects incorrect candidates before timing them', () => {
+  const working = mkdtempSync(join(tmpdir(), 'internagent-correctness-'));
+  try {
+    const file = join(working, 'task.json');
+    const run = join(working, 'run');
+    const cli = (...args) => spawnSync(process.execPath, [runner, ...args], {
+      cwd: working, encoding: 'utf8', env: { ...process.env, CLAUDE_CONFIG_DIR: join(working, 'claude') },
+    });
+    const json = (...args) => {
+      const result = cli(...args);
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout);
+    };
+    mkdirSync(join(working, 'seed'));
+    writeFileSync(join(working, 'seed', 'candidate.txt'), 'valid');
+    writeFileSync(join(working, 'eval.mjs'), `
+      import { readFileSync, writeFileSync } from 'node:fs';
+      import { join } from 'node:path';
+      if (process.argv[2] === 'check') {
+        if (readFileSync(join(process.env.INTERNAGENT_CANDIDATE, 'candidate.txt'), 'utf8') !== 'valid') {
+          throw new Error('Incorrect result');
+        }
+      } else {
+        writeFileSync(process.env.INTERNAGENT_METRICS, '{"median_ms":1}');
+      }
+    `);
+    const command = [process.execPath, 'eval.mjs'];
+    const spec = {
+      type: 'algorithm-engineering', objective: 'faster algorithm', seed: 'seed',
+      direction: 'minimize', metric: 'median_ms', validation: [...command, 'measure'],
+      holdout: [...command, 'measure'], trials: 2,
+    };
+    writeFileSync(file, JSON.stringify(spec));
+    assert.match(cli('init', file, run).stderr, /requires a correctness command/);
+    writeFileSync(file, JSON.stringify({ ...spec, correctness: [...command, 'check'] }));
+    assert.equal(json('init', file, run).type, 'algorithm-engineering');
+    const baseline = json('next', run);
+    assert.equal(json('evaluate', run, baseline.id).score, 1);
+    const draft = json('next', run);
+    writeFileSync(join(draft.candidate, 'candidate.txt'), 'wrong');
+    const failed = json('evaluate', run, draft.id);
+    assert.equal(failed.status, 'failed');
+    assert.match(failed.error, /Correctness check failed/);
+    assert.match(readFileSync(join(failed.output, 'correctness.stderr.log'), 'utf8'), /Incorrect result/);
+    assert.throws(() => readFileSync(join(failed.output, 'stdout.log')), { code: 'ENOENT' });
+    const final = json('finish', run);
+    assert.equal(final.winner, baseline.id);
+    assert.equal(final.holdout.status, 'ok');
+    assert.equal(readFileSync(join(final.holdout.output, 'correctness.stderr.log'), 'utf8'), '');
+  } finally {
+    rmSync(working, { recursive: true, force: true });
+  }
+});
+
 test('persistent model policy precedence, validation, and resume', () => {
   const working = mkdtempSync(join(tmpdir(), 'internagent-models-'));
   try {
