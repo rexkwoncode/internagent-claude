@@ -26,7 +26,7 @@ test('upstream Git submodules match the runtime fetch pins', { skip: !existsSync
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };
-  for (const name of ['MLEvolve', 'ResearchClawBench']) {
+  for (const name of Object.keys(pins)) {
     const path = 'upstream/' + name;
     assert.equal(git('ls-files', '--stage', '--', path), '160000 ' + pins[name].commit + ' 0\t' + path);
     assert.equal(git('config', '-f', '.gitmodules', '--get', 'submodule.' + name + '.path'), path);

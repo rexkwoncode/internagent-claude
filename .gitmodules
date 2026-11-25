@@ -1,3 +1,6 @@
+[submodule "InternAgent"]
+	path = upstream/InternAgent
+	url = https://github.com/InternScience/InternAgent.git
 [submodule "MLEvolve"]
 	path = upstream/MLEvolve
 	url = https://github.com/InternScience/MLEvolve.git

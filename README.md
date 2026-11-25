@@ -7,6 +7,8 @@
 
 **Design, run, and reproduce research experiments in Claude Code.** Start with a question, an implementation to compare, or a paper to reproduce. InternAgent helps define the experiment, test hypotheses, and retain the evidence so you can resume. Use your existing Claude subscription sign-in with no API key.
 
+To run the original Python engines and their memory, research tools, and experiment orchestration, use `/internagent:upstream`. [Set up the upstream runtime](docs/upstream-runtime.md).
+
 [Quickstart](#quickstart) · [Architecture](#architecture) · [Commands](#commands) · [Task catalog](#task-catalog) · [Your own task](#prepare-an-experiment) · [Agent models](#persistent-model-settings) · [Contributing](#contributing)
 
 ## How it works
@@ -30,13 +32,12 @@ Scored runs generate competing hypotheses, critique and revise them, then rank t
 ```mermaid
 flowchart LR
     Claude["Claude Code (subscription)"] --> Plugin["InternAgent plugin"]
-    Plugin --> Discovery["InternAgent idea workflow"]
-    Discovery --> Runner["Local runner (MLEvolve search)"]
-    Runner <--> Evaluator["Project evaluator"]
-    ResearchClaw["ResearchClawBench tasks"] --> Plugin
+    Plugin <-->|Upstream mode| Engine["InternAgent or MLEvolve"]
+    Engine --> Sources["Memory, research tools, and evaluators"]
+    Plugin --> Runner["Lightweight local runner"]
 ```
 
-Claude Code handles inference for the [plugin's skills](skills/) and [agents](agents/). InternAgent routes each task to an experiment, literature research, or paper reproduction. The [discovery workflow](scripts/discovery.mjs) turns ideas into ranked experiment plans. The [local runner](scripts/run.mjs) executes the evaluator and uses the [MLEvolve search port](scripts/search.mjs) to select the next candidate. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned algorithm tasks and paper inputs.
+Claude Code handles inference for the [plugin's skills](skills/) and [agents](agents/). In [upstream mode](docs/upstream-runtime.md), the Python engines own the research and experiment state. In lightweight mode, the [local runner](scripts/run.mjs) checkpoints ideas, chooses candidates with its [search scheduler](scripts/search.mjs), and calls the project evaluator. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned source or selected task inputs.
 
 ## Quickstart
 
@@ -75,6 +76,7 @@ To update, refresh the marketplace in `/plugin` and update `internagent@internag
 | `/internagent:build <research objective>` | Set up and run an experiment using your question, project, and constraints. |
 | `/internagent:run <task.json> [run-directory]` | Run a prepared experiment using its fixed evaluator and seed. |
 | `/internagent:run resume <run-directory>` | Continue from the recorded trial state in another session. |
+| `/internagent:upstream <options.json>` | Drive the pinned InternAgent or MLEvolve Python engine from your Claude Code session. |
 | `/internagent:configure` | Choose and save Claude agent model defaults interactively. |
 | `/internagent:discover <list\|task-id\|task-folder> [arguments]` | Find and run a catalog task, upstream discovery experiment, or paper reproduction. |
 | `/internagent:research <question>` | Answer a research question and prepare evidence-based hypotheses. |
@@ -233,15 +235,14 @@ Supported values are `haiku`, `sonnet`, `opus`, `fable`, and `inherit`. With `in
 
 ## Upstream components
 
-- **InternAgent** supplies the hypothesis workflow and pinned task definitions. The native port uses JSON task specs, Claude Code research tools where available, and keyword retrieval over earlier local runs. The upstream Python distribution provides embedding-based idea memory, external provider integrations, and a YAML launcher.
-- **MLEvolve** is pinned under `upstream/MLEvolve/`. The native search port uses the trial budget for exploration and exploitation and runs candidate evaluations sequentially. Upstream MLEvolve also supports wall-clock scheduling, parallel workers, and GPU allocation. Its Python runner has its own dependencies and provider configuration.
+- **InternAgent** is pinned under `upstream/InternAgent/`. The upstream command runs its Python launcher, hypothesis agents, and configured memory. The regular local runner uses JSON task specs and keyword retrieval over earlier runs.
+- **MLEvolve** is pinned under `upstream/MLEvolve/`. The upstream command calls its original Python runner for progressive graph search, parallel workers, wall-clock scheduling, GPU allocation, and search memory. The lightweight scheduler allocates a trial budget and evaluates candidates sequentially.
 - **ResearchClawBench** is a Git submodule pinned under `upstream/ResearchClawBench/` at the same commit as InternAgent's `sci_tasks`. The plugin's lightweight task index ships separately. The reproduction skill uses the selected paper, dataset, and checklist to produce an evidence review.
 
 The [submodule URLs](.gitmodules) and [runtime fetch pins](upstream/revisions.json) identify the upstream sources. Plugin installs and ZIP archives contain the native workflow and task index. To check out the upstream source in a Git clone, initialize the submodule you need.
 
 ```shell
-git submodule update --init upstream/MLEvolve
-git submodule update --init upstream/ResearchClawBench
+git submodule update --init upstream/InternAgent upstream/MLEvolve upstream/ResearchClawBench
 ```
 
 The full ResearchClawBench checkout includes all benchmark assets. Fetch an individual task if you only need its inputs.
