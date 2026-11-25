@@ -1,0 +1,14 @@
+{
+  "name": "internagent-claude",
+  "description": "Claude Code plugins for local model building and research.",
+  "owner": {
+    "name": "rexkwoncode"
+  },
+  "plugins": [
+    {
+      "name": "internagent",
+      "source": ".",
+      "description": "Run reproducible ML model search and research workflows with Claude Code."
+    }
+  ]
+}

@@ -26,18 +26,22 @@ The search starts with independent drafts, refines promising candidates, and can
 
 ## Quickstart
 
-Install [Claude Code](https://code.claude.com/docs/en/setup) and [Node.js 20+](https://nodejs.org/). Clone this repository, then load the checkout from your ML project's working directory.
+Install [Claude Code](https://code.claude.com/docs/en/setup) and [Node.js 20+](https://nodejs.org/). Start Claude Code from your ML project directory, then add the marketplace and install the plugin.
+
+```text
+/plugin marketplace add https://github.com/rexkwoncode/internagent-claude.git
+/plugin install internagent@internagent-claude
+```
+
+The repository is private. Installation requires GitHub read access and a credential your local Git helper can use without prompting. If needed, sign in with `gh auth login` and configure the helper with `gh auth setup-git`. Claude inference uses your Claude subscription separately.
+
+The same install is available from a shell.
 
 ```shell
-git clone https://github.com/rexkwoncode/internagent-claude.git
+claude plugin install internagent --marketplace https://github.com/rexkwoncode/internagent-claude.git
 ```
 
-```powershell
-claude auth status
-claude --plugin-dir "C:/path/to/internagent-claude"
-```
-
-Check that `claude auth status` reports `authMethod: claude.ai`. If your shell normally sets an Anthropic API key or uses a custom provider, launch from a shell configured for Claude subscription sign-in. The plugin inherits Claude Code's authentication, model, usage limits, and permissions.
+For subscription use, check that `claude auth status` reports `authMethod: claude.ai`. If your shell normally sets an Anthropic API key or uses a custom provider, launch from a shell configured for Claude subscription sign-in. The plugin inherits Claude Code's authentication, model, usage limits, and permissions.
 
 Try the bundled example inside Claude Code.
 
@@ -46,6 +50,8 @@ Try the bundled example inside Claude Code.
 ```
 
 One verified five-trial run on the synthetic regression task reduced validation MSE from **10.8818** to **0.00317**, with **0.00339** on the holdout. Candidate choices and scores can vary between runs.
+
+To update, refresh the marketplace in `/plugin` and update `internagent@internagent-claude` from the Installed tab. For local development, clone the repo and launch `claude --plugin-dir /path/to/internagent-claude`.
 
 ## Commands
 
@@ -132,7 +138,8 @@ Omit the final task name to fetch the full benchmark. Some tasks require additio
 Work on a branch and run the checks from the repository root before opening a pull request. Include a minimal task spec or reproducible fixture for workflow changes. Keep datasets, credentials, and experiment outputs in your local project.
 
 ```powershell
-claude plugin validate --strict .
+claude plugin validate --strict .claude-plugin/marketplace.json
+claude plugin validate --strict .claude-plugin/plugin.json
 node --test
 ```
 
