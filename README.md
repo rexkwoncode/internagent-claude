@@ -97,7 +97,7 @@ claude -p "/internagent:run demo .internagent/demo" --plugin-dir $plugin --permi
 /internagent:discover Astronomy_000
 ```
 
-The catalog covers the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json) and 40 [ResearchClawBench paper tasks](upstream/ResearchClawBench/task-index.json). The plugin fetches the selected task on demand. Use a local task folder to work with an existing checkout or a custom task.
+The catalog covers the 13 algorithm task IDs at the [pinned InternAgent revision](upstream/revisions.json) and 40 [ResearchClawBench paper tasks](upstream/researchclawbench-task-index.json). The plugin fetches the selected task on demand. Use a local task folder to work with an existing checkout or a custom task.
 
 | Tasks | Workflow |
 | --- | --- |
@@ -190,8 +190,17 @@ Supported values are `haiku`, `sonnet`, `opus`, `fable`, and `inherit`. With `in
 ## Upstream components
 
 - **InternAgent** supplies the discovery workflow pattern. The native skills implement research questions, hypothesis-driven experiments, evaluation, and reuse of recorded results. The runner retrieves relevant successes and failures from project-local trial histories using keyword overlap. The native port uses JSON task specs and Claude Code tools. Upstream YAML launchers, service integrations, and embedding memory remain part of the original Python distribution.
-- **MLEvolve** is included at the revision in [upstream/revisions.json](upstream/revisions.json), with its upstream license and source under `upstream/MLEvolve/`. The subscription workflow uses the native search scheduler and Claude Code agents for independent drafts, progressive exploration, improvements, debug retries, and cross-branch fusion. This scheduler is a sequential port of those search behaviors. Upstream's concurrent Python search, embedding retrieval, dependency stack, and API provider configuration apply when launching the archived Python entry point directly.
-- **ResearchClawBench** is InternAgent's `sci_tasks` Git submodule. Its pinned evaluation source, license, and task index ship under `upstream/ResearchClawBench/`. The fetcher can materialize only the paper task you intend to run, including its data and reference files. The reproduction skill consumes the task metadata, data, paper, and checklist, and uses Claude Code for evidence review. Its assessment uses the supplied rubric and is distinct from a score produced by the upstream leaderboard runner.
+- **MLEvolve** is a Git submodule pinned under `upstream/MLEvolve/`. The subscription workflow uses the native search scheduler and Claude Code agents for independent drafts, progressive exploration, improvements, debug retries, and cross-branch fusion. The upstream Python entry point has its own dependencies and provider configuration.
+- **ResearchClawBench** is a Git submodule pinned under `upstream/ResearchClawBench/` at the same commit as InternAgent's `sci_tasks`. The plugin's lightweight task index ships separately. The reproduction skill uses the selected paper, dataset, and checklist to produce an evidence review.
+
+The [submodule URLs](.gitmodules) and [runtime fetch pins](upstream/revisions.json) identify the upstream sources. Plugin installs and ZIP archives contain the native workflow and task index. To check out the upstream source in a Git clone, initialize the submodule you need.
+
+```shell
+git submodule update --init upstream/MLEvolve
+git submodule update --init upstream/ResearchClawBench
+```
+
+The full ResearchClawBench checkout includes all benchmark assets. Fetch an individual task if you only need its inputs.
 
 The plugin includes a pinned fetcher that uses Git and public GitHub access. To reproduce a task, first fetch into your project, then launch its skill from that project.
 

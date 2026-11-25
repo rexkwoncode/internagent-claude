@@ -6,6 +6,7 @@ This distribution ports workflow and search behavior from:
 - MLEvolve, Copyright 2026 MLEvolve Team, Shanghai Artificial Intelligence Laboratory, Apache License 2.0.
   https://github.com/InternScience/MLEvolve
 
-The original MLEvolve snapshot and its license accompany this distribution under upstream/MLEvolve.
 The Claude Code skills, local runner, search scheduler, and synthetic example are native adaptations.
-The ResearchClawBench evaluation source is distributed under its MIT license in upstream/ResearchClawBench. Benchmark datasets and paper assets are fetched separately from https://github.com/InternScience/ResearchClawBench under their upstream terms.
+The pinned MLEvolve and ResearchClawBench Git submodules carry their own upstream licenses.
+ResearchClawBench is available under the MIT license. Benchmark datasets and paper assets are fetched separately under their upstream terms.
+https://github.com/InternScience/ResearchClawBench

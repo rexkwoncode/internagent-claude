@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -9,6 +9,7 @@ import { metricValue } from '../scripts/benchmarks.mjs';
 
 const adapter = fileURLToPath(new URL('../scripts/benchmarks.mjs', import.meta.url));
 const runner = fileURLToPath(new URL('../scripts/run.mjs', import.meta.url));
+const repo = fileURLToPath(new URL('../', import.meta.url));
 const invoke = (script, cwd, ...args) => spawnSync(process.execPath, [script, ...args], {
   cwd, encoding: 'utf8', env: { ...process.env, CLAUDE_CONFIG_DIR: join(cwd, 'test-claude') },
 });
@@ -17,6 +18,21 @@ function json(result) {
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
 }
+
+test('upstream Git submodules match the runtime fetch pins', { skip: !existsSync(join(repo, '.git')) }, () => {
+  const pins = JSON.parse(readFileSync(join(repo, 'upstream/revisions.json'), 'utf8'));
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim();
+  };
+  for (const name of ['MLEvolve', 'ResearchClawBench']) {
+    const path = 'upstream/' + name;
+    assert.equal(git('ls-files', '--stage', '--', path), '160000 ' + pins[name].commit + ' 0\t' + path);
+    assert.equal(git('config', '-f', '.gitmodules', '--get', 'submodule.' + name + '.path'), path);
+    assert.equal(git('config', '-f', '.gitmodules', '--get', 'submodule.' + name + '.url'), pins[name].url);
+  }
+});
 
 test('task catalog and paper routing', () => {
   const catalog = json(invoke(adapter, tmpdir(), 'list'));

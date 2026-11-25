@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const script = fileURLToPath(import.meta.url);
 const read = file => JSON.parse(readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
 const catalog = read(new URL('../upstream/task-catalog.json', import.meta.url));
-const papers = read(new URL('../upstream/ResearchClawBench/task-index.json', import.meta.url));
+const papers = read(new URL('../upstream/researchclawbench-task-index.json', import.meta.url));
 const defaults = {
   argv: ['bash', '{launcher}'],
   cwd: '.',
