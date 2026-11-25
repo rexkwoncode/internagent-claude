@@ -173,13 +173,29 @@ def register_paper_judge(checkout, mailbox, alias):
 
 
 def register_experiment_runner(mailbox):
-    from internagent.experiments_utils_claude import ClaudeCodeRunner
+    from internagent import experiments_utils_claude as experiments
 
     def run(self, prompt, cwd=None):
         workspace = str(Path(cwd or os.getcwd()).resolve())
         return mailbox.ask_sync("experiment", model=self.model, prompt=prompt, workspace=workspace)
 
-    ClaudeCodeRunner.run = run
+    experiments.ClaudeCodeRunner.run = run
+    if os.name == "nt":
+        import shutil
+
+        subprocess = experiments.subprocess
+
+        def launch(command, *args, **options):
+            if isinstance(command, (list, tuple)) and command and command[0] == "bash":
+                configured = os.environ.get("CLAUDE_CODE_GIT_BASH_PATH")
+                git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe"
+                executable = configured or (str(git_bash) if git_bash.is_file() else shutil.which("bash"))
+                if not executable or not Path(executable).is_file():
+                    raise FileNotFoundError("Set CLAUDE_CODE_GIT_BASH_PATH to the installed Git Bash executable.")
+                command = [executable, *command[1:]]
+            return subprocess.Popen(command, *args, **options)
+
+        experiments.subprocess = SimpleNamespace(**{**vars(subprocess), "Popen": launch})
 
 
 def load_settings(path):

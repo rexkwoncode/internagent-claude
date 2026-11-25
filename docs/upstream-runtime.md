@@ -16,7 +16,7 @@ Use the pins in [upstream/revisions.json](../upstream/revisions.json). In a Git 
 
 Install the Python requirements documented by the selected engine in a virtual environment with the dependencies for the selected task. Benchmarks can also need a Unix shell, datasets, Graphviz, training libraries, or compatible accelerators. Paths inside `args` are interpreted by the upstream launcher. Use absolute paths for task folders, results, and resume directories.
 
-On Windows, install `psutil` in the MLEvolve environment and use `copy_data=true` when symlinks are unavailable. Benchmark launchers that require Linux can run in a Claude Code session started inside WSL.
+On Windows, InternAgent uses Git Bash for its benchmark launchers. Set `CLAUDE_CODE_GIT_BASH_PATH` if your Git Bash is installed outside the standard location. For MLEvolve, install `psutil` and use `copy_data=true` when symlinks are unavailable. Benchmark launchers that require Linux can run in a Claude Code session started inside WSL.
 
 ### InternAgent
 
