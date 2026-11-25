@@ -27,6 +27,10 @@ models:
   default_provider: claude-code
   claude-code:
     model_name: opus
+agents:
+  exp_analyze:
+    provider: claude-code
+    model_name: opus
 experiment:
   model: opus
 ```
