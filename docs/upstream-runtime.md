@@ -55,7 +55,32 @@ Write an options JSON file in your project and invoke `/internagent:run internag
 
 The original launcher also accepts `--resume`, `--offline_feedback`, `--skip_idea_generation`, `--idea_path`, and report mode. Run its `--help` for the full argument list.
 
-### MLEvolve
+### MLEvolve as InternAgent's ML backend
+
+Keep `engine` set to `InternAgent` and add `mlevolve` to the options file. InternAgent sends each selected hypothesis and method to a separate MLEvolve search. It then scores the winning solution with your fixed evaluator and stores the measured result through InternAgent's normal online memory. The search has its own journal and can use MLEvolve's own memory. Both engines send model requests to the same Claude Code session.
+
+```json
+{
+  "engine": "InternAgent",
+  "checkout": ".internagent/upstream/InternAgent",
+  "args": ["--task", "C:/research/digits", "--output_dir", "C:/research/results"],
+  "mlevolve": {
+    "checkout": ".internagent/upstream/MLEvolve",
+    "data": "digits/search-input",
+    "description": "digits/search-task.md",
+    "metric": "accuracy",
+    "direction": "maximize",
+    "evaluate": ["python", "evaluate.py"],
+    "args": ["agent.steps=4", "agent.initial_drafts=2", "agent.search.num_gpus=0"]
+  }
+}
+```
+
+Use the pinned MLEvolve checkout and install its requirements. If the engines need separate environments, set `mlevolve.python` to the MLEvolve interpreter. The MLEvolve data and description paths are relative to the options file. The fixed evaluator runs from that file's directory and receives the selected code and submission as `INTERNAGENT_SOLUTION` and `INTERNAGENT_SUBMISSION`. Write a JSON object such as `{"accuracy": 0.98}` to `INTERNAGENT_METRICS`. The `INTERNAGENT_OUTPUT` directory holds the selected model and evaluation logs.
+
+Measure the starting baseline with the same development protocol and place the score in the task's `run_0/final_info.json` under the same metric. Keep final holdout data outside the search and evaluation loop. Subsequent incremental rounds receive the selected code as reference material. The default search budget is six steps per hypothesis, with two initial drafts. Override these values in `mlevolve.args`. For paper reproduction and other unconfigured tasks, InternAgent uses its regular experiment backend.
+
+### Standalone MLEvolve
 
 Use a MLEvolve configuration and the original Hydra-style arguments. Set `agent.code.model` and `agent.feedback.model` to Claude aliases when you want explicit per-role models. Otherwise the plugin maps its bundled model names to the configured builder and planner models.
 

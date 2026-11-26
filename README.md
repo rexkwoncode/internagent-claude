@@ -32,12 +32,13 @@ Scored runs generate competing hypotheses, critique and revise them, then rank t
 ```mermaid
 flowchart LR
     Claude["Claude Code (subscription)"] --> Plugin["InternAgent plugin"]
-    Plugin <-->|Default| Engine["InternAgent or MLEvolve"]
-    Engine --> Sources["Memory, research tools, and evaluators"]
+    Plugin <-->|Default| Engine["InternAgent"]
+    Engine <-->|ML search| ML["MLEvolve"]
+    Engine --> Sources["Research tools, evaluation, and memory"]
     Plugin --> Runner["Lightweight local runner"]
 ```
 
-Claude Code handles inference for the [plugin's skills](skills/) and [agents](agents/). In [upstream mode](docs/upstream-runtime.md), the Python engines own the research and experiment state. In lightweight mode, the [local runner](scripts/run.mjs) checkpoints ideas, chooses candidates with its [search scheduler](scripts/search.mjs), and calls the project evaluator. The [upstream fetcher](scripts/upstream.mjs) retrieves pinned source or selected task inputs.
+Claude Code handles inference for the [plugin's skills](skills/) and [agents](agents/). For [ML research](docs/upstream-runtime.md#mlevolve-as-internagents-ml-backend), InternAgent owns the discovery workflow and sends hypotheses to MLEvolve for candidate search. A fixed evaluator measures the selected model and InternAgent records those metrics in its own memory. The [lightweight runner](scripts/run.mjs) is available for smaller experiments.
 
 ## Quickstart
 

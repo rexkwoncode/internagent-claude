@@ -386,6 +386,29 @@ def main():
             OpenAIEmbeddingFunction=lambda **_: local_embeddings(),
         )
 
+    backend_config = mailbox.directory / "mlevolve-backend.json"
+    if backend_config.is_file():
+        if is_paper_task(checkout, args):
+            raise ValueError("MLEvolve requires a scored ML task. Use InternAgent's paper reproduction backend here.")
+        import importlib.util
+
+        provider = Path(__file__).resolve()
+        spec = importlib.util.spec_from_file_location("mlevolve_backend", provider.with_name("mlevolve-backend.py"))
+        backend = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(backend)
+        settings = load_settings(backend_config)
+        analyzer = config.setdefault("agents", {}).setdefault("exp_analyze", {})
+        analyzer.setdefault("provider", config.get("models", {}).get("default_provider", "openai"))
+        if analyzer["provider"] == "claude-code":
+            analyzer.setdefault("model_name", "configured")
+        analyzer["primary_metric"] = settings["metric"]
+        analyzer.setdefault("custom_metric_config", {})[settings["metric"]] = (
+            "lower" if settings["direction"] == "minimize" else "higher"
+        )
+        config_path = str(mailbox.directory / "internagent-effective-config.json")
+        Path(config_path).write_text(json.dumps(config, indent=2), encoding="utf-8")
+        backend.install(settings, mailbox, provider)
+
     launcher = checkout / "launch_discovery.py"
     sys.argv = [str(launcher), "--config", config_path, *args]
     runpy.run_path(str(launcher), run_name="__main__")

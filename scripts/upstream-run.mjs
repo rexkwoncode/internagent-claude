@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout } from 'node:timers/promises';
 
@@ -19,6 +19,47 @@ function save(path, value) {
   }
 }
 
+function pinnedCheckout(directory, engine) {
+  const pin = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: directory, encoding: 'utf8' });
+  if (pin.status !== 0 || pin.stdout.trim() !== pins[engine].commit) {
+    throw new Error('Use the pinned ' + engine + ' checkout from upstream/revisions.json.');
+  }
+  return directory;
+}
+
+function mlBackend(input, settings, python) {
+  if (settings === undefined) return;
+  const nonempty = value => typeof value === 'string' && value.trim().length > 0;
+  const argv = value => Array.isArray(value) && value.every(nonempty);
+  if (!settings || !['checkout', 'data', 'description', 'metric'].every(key => nonempty(settings[key])) ||
+      !argv(settings.evaluate) || !settings.evaluate.length ||
+      !['minimize', 'maximize'].includes(settings.direction) ||
+      (settings.args !== undefined && !argv(settings.args)) ||
+      (settings.python !== undefined && !nonempty(settings.python))) {
+    throw new Error('MLEvolve backend requires checkout, data, description, metric, direction, and evaluator argv.');
+  }
+  const executable = value => isAbsolute(value) || /[\\/]/.test(value) ? resolve(input, value) : value;
+  const data = resolve(input, settings.data);
+  const description = resolve(input, settings.description);
+  if (!statSync(data, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error('Missing MLEvolve data directory: ' + data);
+  }
+  if (!statSync(description, { throwIfNoEntry: false })?.isFile()) {
+    throw new Error('Missing MLEvolve task description: ' + description);
+  }
+  return {
+    checkout: pinnedCheckout(resolve(input, settings.checkout), 'MLEvolve'),
+    python: settings.python ? executable(settings.python) : python,
+    data,
+    description,
+    metric: settings.metric,
+    direction: settings.direction,
+    args: settings.args ?? [],
+    evaluate: [executable(settings.evaluate[0]), ...settings.evaluate.slice(1)],
+    evaluatorCwd: input,
+  };
+}
+
 function run(directory, optionsFile) {
   const options = read(resolve(optionsFile));
   const { engine, checkout: location, python = 'python', args = [], config } = options;
@@ -30,10 +71,12 @@ function run(directory, optionsFile) {
     throw new Error('Expected engine, checkout, optional python and args, and optional InternAgent config.');
   }
   const input = dirname(resolve(optionsFile));
-  const checkout = resolve(input, location);
-  const pin = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: checkout, encoding: 'utf8' });
-  if (pin.status !== 0 || pin.stdout.trim() !== pins[engine].commit) {
-    throw new Error('Use the pinned ' + engine + ' checkout from upstream/revisions.json.');
+  const checkout = pinnedCheckout(resolve(input, location), engine);
+  const backend = mlBackend(input, options.mlevolve, python);
+  if (backend && (engine !== 'InternAgent' || args.some((arg, index) =>
+    (arg === '--exp_backend' && args[index + 1] !== 'claudecode') ||
+    (arg.startsWith('--exp_backend=') && arg !== '--exp_backend=claudecode')))) {
+    throw new Error('The MLEvolve backend requires engine InternAgent and the claudecode launcher.');
   }
   const configPath = config && resolve(input, config);
   if (engine === 'InternAgent' && configPath && !existsSync(configPath)) {
@@ -41,6 +84,7 @@ function run(directory, optionsFile) {
   }
   mkdirSync(dirname(directory), { recursive: true });
   mkdirSync(directory);
+  if (backend) save(join(directory, 'mlevolve-backend.json'), backend);
   const adapter = fileURLToPath(new URL('upstream-provider.py', import.meta.url));
   const argumentsForEngine = engine === 'InternAgent' ? [configPath ?? '-', ...args] : args;
   if (engine === 'InternAgent' && !args.some(arg => /^--exp_backend(?:=|$)/.test(arg))) {
