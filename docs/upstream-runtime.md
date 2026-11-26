@@ -57,6 +57,8 @@ The original launcher also accepts `--resume`, `--offline_feedback`, `--skip_ide
 
 ### MLEvolve as InternAgent's ML backend
 
+[Trace the full workflow in the sequence diagram](ml-search-sequence.md).
+
 Keep `engine` set to `InternAgent` and add `mlevolve` to the options file. InternAgent sends each selected hypothesis and method to a separate MLEvolve search. It then scores the winning solution with your fixed evaluator and stores the measured result through InternAgent's normal online memory. The search has its own journal and can use MLEvolve's own memory. Both engines send model requests to the same Claude Code session.
 
 ```json
